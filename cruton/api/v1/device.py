@@ -90,6 +90,8 @@ class Devices(BaseDevice, v1_api.ApiSkelRoot):
 
         returns = list()
         for item in item_list:
+            if not item:
+                continue
             dev_id = item.pop('dev_id', None)
             if not dev_id:
                 return make_response(

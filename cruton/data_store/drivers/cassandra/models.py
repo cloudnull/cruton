@@ -113,7 +113,7 @@ class Devices(CrutonBaseModel):
     ports = cql.columns.Map(
         default=dict(),
         key_type=cql.columns.Text(),
-        value_type=cql.columns.Integer()
+        value_type=cql.columns.Text()
     )
     vars = cql.columns.Map(
         default=dict(),

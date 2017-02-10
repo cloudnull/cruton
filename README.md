@@ -35,6 +35,12 @@ GRANT ALL ON KEYSPACE cruton TO cruton;
 
 ## Installation of Cruton.
 
+Installing the base system requirements
+``` bash
+apt-get install -y python-dev build-essential
+```
+
+Installing the python source code.
 ``` bash
 # Create a python virtual environment and activate the venv
 virtualenv cruton
@@ -53,10 +59,14 @@ Once the package is installed create the configuration file for the API. The ass
 [DEFAULT]
 driver = cassandra
 
+[api]
+host = 0.0.0.0
+port = 5150
+
 [data_store]
 username = cruton
 password = secrete
-cluster_node = 127.0.0.1
+cluster_node = 172.99.106.30
 port = 9042
 ```
 
@@ -183,8 +193,9 @@ CREATE INDEX devices_name_idx ON cruton.devices (name);
 ## Working with the API.
 
 To start the API it's recommended that you run the service behind a webserver like NGINX, Apache, using uWSGI, etc.
-The typical API process can be envoked by running the ``cruton-api-wsgi`` command. If you need or want to run the
-API in debug mode you can do so by invoking the ``cruton-api-debug`` command.
+The typical API process can be envoked by running the ``cruton-api-wsgi --config-file /etc/cruton/cruton.ini`` command.
+If you need or want to run the API in debug mode you can do so by invoking the ``cruton-api-debug --config-file /etc/cruton/cruton.ini``
+command.
 
 ### Entities
 
@@ -197,17 +208,17 @@ application to discover all available actions for all available versions.
 
 ###### PUT an entity
 ``` bash
-curl -H 'Content-Type: application/json' -D - -XPUT http://127.0.0.1:5150/v1/entities/Solo1 -d '{"name": "TestEntitySolo"}'
+curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1' -d '{"name": "TestEntitySolo"}'
 ```
 
 ###### HEAD an entities
 ```
-curl --head 'http://127.0.0.1:5150/v1/entities
+curl --head 'http://127.0.0.1:5150/v1/entities'
 ```
 
 ###### POST one or many entities
 ``` bash
-curl -H 'Content-Type: application/json'  -D - -XPOST http://127.0.0.1:5150/v1/entities -d '[{"ent_id": "Ent1", "tags": ["TestEntityTagOne",], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEntityOne"}, {"ent_id": "Ent2", "tags": ["TestEntityTagOne", "TestEntityTagTwo"], "contacts": {"person2": "email@person2.example.com"}, "name": "TestEntityTwo"}]'
+curl -H 'Content-Type: application/json'  -D - -XPOST 'http://127.0.0.1:5150/v1/entities' -d '[{"ent_id": "Ent1", "tags": ["TestEntityTagOne",], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEntityOne"}, {"ent_id": "Ent2", "tags": ["TestEntityTagOne", "TestEntityTagTwo"], "contacts": {"person2": "email@person2.example.com"}, "name": "TestEntityTwo"}]'
 ```
 
 ###### GET entities
@@ -231,7 +242,7 @@ You should be aware that **ANY** field in the data module can be part of the sea
 
 ###### PUT an environment
 ``` bash
-curl -H 'Content-Type: application/json' -D - -XPUT http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1 -d '{"name": "SoloEnvironmentOne"}'
+curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1' -d '{"name": "SoloEnvironmentOne"}'
 ```
 
 ###### HEAD environments
@@ -242,12 +253,12 @@ curl --head 'http://127.0.0.1:5150/v1/entities/Ent1/environments'
 
 ###### POST one or many environments
 ``` bash
-curl -H 'Content-Type: application/json' -D - -XPOST http://127.0.0.1:5150/v1/entities/Ent1/environments -d '[{"env_id": "Env1", "tags": ["TestEnvironmentTagOne"], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEnvironmentOne"}, {"env_id": "Env2", "tags": ["TestEnvironmentTagOne", "TestEnvironmentTagTwo"], "contacts": {"person1": "4155551212"}, "name": "TestEnvironmentTwo"}]'
+curl -H 'Content-Type: application/json' -D - -XPOST 'http://127.0.0.1:5150/v1/entities/Ent1/environments' -d '[{"env_id": "Env1", "tags": ["TestEnvironmentTagOne"], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEnvironmentOne"}, {"env_id": "Env2", "tags": ["TestEnvironmentTagOne", "TestEnvironmentTagTwo"], "contacts": {"person1": "4155551212"}, "name": "TestEnvironmentTwo"}]'
 ```
 
 ###### GET environments
 ``` bash
-curl -D - http://127.0.0.1:5150/v1/entities/x/environments/Env2
+curl -D - 'http://127.0.0.1:5150/v1/entities/x/environments/Env2'
 ```
 
 ###### GET environments and search
@@ -266,7 +277,7 @@ You should be aware that **ANY** field in the data module can be part of the sea
 
 ###### PUT a device
 ``` bash
-curl -H 'Content-Type: application/json' -D - -XPUT http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices/SoloDev1 -d '{"name": "SoloDeviceOne"}'
+curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices/SoloDev1' -d '{"name": "SoloDeviceOne"}'
 ```
 
 ###### HEAD a device
@@ -276,7 +287,7 @@ curl --head http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/device
 
 ###### POST one or many devices
 ``` bash
-curl -H 'Content-Type: application/json' -D - -XPOST http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices -d '[{"dev_id": "Dev1", "tags": ["TestEnvironmentTagOne"], "access_ip": {"drac": "172.16.24.1", "mgmt": "fe80::6656:fc1d:cd1:ddba"}, "rack_id": "TestRack1", "row_id": "TestRow1", "name": "TestDeviceOne"}, {"dev_id": "Dev2", "tags": ["TestDeviceTagOne", "TestDeviceTagTwo"], "access_ip": {"drac": "172.16.24.2", "mgmt": "fe80::6656:fc1d:cd1:ddbb"}, "rack_id": "TestRack2", "row_id": "TestRow1", "name": "TestDeviceTwo"}]'
+curl -H 'Content-Type: application/json' -D - -XPOST 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices' -d '[{"dev_id": "Dev1", "tags": ["TestEnvironmentTagOne"], "access_ip": {"drac": "172.16.24.1", "mgmt": "fe80::6656:fc1d:cd1:ddba"}, "rack_id": "TestRack1", "row_id": "TestRow1", "name": "TestDeviceOne"}, {"dev_id": "Dev2", "tags": ["TestDeviceTagOne", "TestDeviceTagTwo"], "access_ip": {"drac": "172.16.24.2", "mgmt": "fe80::6656:fc1d:cd1:ddbb"}, "rack_id": "TestRack2", "row_id": "TestRow1", "name": "TestDeviceTwo"}]'
 ```
 
 ###### GET devices

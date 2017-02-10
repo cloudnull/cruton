@@ -1,0 +1,62 @@
+---
+# Copyright 2017, Rackspace US, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: Environment Device Population
+  hosts: hosts
+  user: root
+  pre_tasks:
+    - name: Building a variable map
+      no_log: true
+      set_fact:
+        ansible_vars: >-
+          {% set node_post = {} %}
+          {% set _ = node_post.update({'vars': {}}) %}
+          {% set var_set = node_post['vars'] %}
+          {% set _ = node_post.update({'access_ip': {}}) %}
+          {% set access_ip_set = node_post['access_ip'] %}
+          {% set _ = node_post.update({'ports': {}}) %}
+          {% set ports_set = node_post['ports'] %}
+          {% for k, v in hostvars[inventory_hostname].items() %}
+          {%   if k.startswith('ansible') and v is string %}
+          {%     set _ = var_set.update({k.replace('ansible_', '').strip(): v.strip()}) %}
+          {%   elif k.startswith('ansible') and v is mapping %}
+          {%     if 'device' in v and 'pciid' in v %}
+          {%       set _ = ports_set.update({v['device'].strip(): v['pciid'].strip()}) %}
+          {%     endif %}
+          {%     if 'device' in v and 'ipv4' in v %}
+          {%       set _ = access_ip_set.update({v['device'].strip(): v['ipv4']['address'].strip()}) %}
+          {%     endif %}
+          {%   endif %}
+          {% endfor %}
+          {% set _ = node_post.update({'name': ansible_hostname}) %}
+          {% set _ = node_post.update({'dev_id': ansible_hostname}) %}
+          {{ node_post }}
+
+    - name: Running variable cleanup
+      no_log: true
+      set_fact:
+        cruton_vars: "[{{ ansible_vars.strip() }}]"
+
+    - name: Posting to the cruton API
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/{{ api_entity }}/environments/{{ api_environment }}/devices"
+        method: "POST"
+        body: '{{ cruton_vars | to_json }}'
+        body_format: "json"
+        status_code: 201
+  vars:
+    api_endpoint: "http://127.0.0.1"
+    api_entity: "EntityOne"
+    api_environment: "EnvironmentOne"
