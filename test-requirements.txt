@@ -1,0 +1,9 @@
+# Needed for testing
+flake8<2.6.0,>=2.5.4
+nose
+mock>=2.0
+sphinx!=1.3b1,<1.4,>=1.2.1
+
+oslotest>=1.10.0
+oslosphinx>=4.7.0
+testtools>=1.4.0
