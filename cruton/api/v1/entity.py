@@ -114,6 +114,8 @@ class Entities(v1_api.ApiSkelRoot, BaseEntity):
 
         returns = list()
         for item in item_list:
+            if not item:
+                continue
             ent_id = item.pop('ent_id', None)
             if not ent_id:
                 return make_response(

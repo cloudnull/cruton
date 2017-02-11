@@ -14,8 +14,7 @@
 # limitations under the License.
 
 - name: Environment Device Population
-  hosts: hosts
-  user: root
+  hosts: all
   pre_tasks:
     - name: Building a variable map
       no_log: true

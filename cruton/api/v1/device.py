@@ -136,16 +136,25 @@ class Device(BaseDevice, v1_api.ApiSkelPath):
                     self._get(ent_id=ent_id, env_id=env_id, dev_id=dev_id)[0]
                 )
             )
+        except IndexError:
+            return make_response(jsonify('Not Found'), 404)
         except self.exp.InvalidRequest:
-            return make_response(jsonify('DoesNotExist'), 404)
+            return make_response(jsonify('Invalid Request'), 400)
         except Exception as exp:
             return make_response(jsonify(str(exp)), 400)
 
     def head(self, ent_id, env_id, dev_id=None):
         resp = make_response()
-        resp.headers['Content-Device-Exists'] = len(self._get(
-            ent_id=ent_id, env_id=env_id, dev_id=dev_id)
-        ) > 0
+        dev = self._get(ent_id=ent_id, env_id=env_id, dev_id=dev_id)
+        if not len(dev) > 0:
+            resp.headers['Content-Device-Exists'] = False
+        else:
+            device = dev[0]
+            resp.headers['Content-Device-Exists'] = True
+            resp.headers['Content-Device-Last-Updated'] = device['updated_at']
+            resp.headers['Content-Device-Created'] = device['created_at']
+            resp.headers['Content-Device-uuid'] = device['id']
+            resp.headers['Content-Device-Description'] = device['description']
         return resp
 
     def put(self, ent_id, env_id, dev_id=None):

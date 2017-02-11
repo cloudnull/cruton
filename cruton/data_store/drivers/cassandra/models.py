@@ -72,6 +72,7 @@ class Environments(CrutonBaseModel):
 
     env_id = cql.columns.Text(primary_key=True)
     ent_id = cql.columns.Text(primary_key=True)
+    description = cql.columns.Text(default=None)
     contacts = cql.columns.Map(
         default=dict(),
         key_type=cql.columns.Text(),
@@ -101,6 +102,7 @@ class Devices(CrutonBaseModel):
     dev_id = cql.columns.Text(primary_key=True)
     env_id = cql.columns.Text(primary_key=True)
     ent_id = cql.columns.Text(primary_key=True)
+    description = cql.columns.Text(default=None)
     row_id = cql.columns.Text(default=None)
     rack_id = cql.columns.Text(default=None)
     units = cql.columns.Integer(default=None)

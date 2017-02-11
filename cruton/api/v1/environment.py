@@ -83,6 +83,8 @@ class Environments(v1_api.ApiSkelRoot, BaseEnvironments):
 
         returns = list()
         for item in item_list:
+            if not item:
+                continue
             env_id = item.pop('env_id', None)
             if not env_id:
                 return make_response(

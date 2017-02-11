@@ -21,11 +21,13 @@ from cassandra.cqlengine import connection
 from cassandra.auth import PlainTextAuthProvider
 
 from oslo_config import cfg
+from oslo_log import log as logging
 
 import models
 
 
 CONF = cfg.CONF
+LOG = logging.getLogger(__name__)
 
 
 class Exceptions(object):
@@ -71,10 +73,10 @@ def setup():
     return connection
 
 
-def _search(self, q, tag, contact=None, access_ip=None, ports=None, vars=None):
+def _search(self, q, search_dict):
     """Search query results."""
     all_list = [dict(i.items()) for i in q.all()]
-    if not self.query and not tag and not contact:
+    if not any([i['opt'] for i in search_dict.values()]):
         return [self._friendly_return(i) for i in all_list]
 
     q_list = list()
@@ -85,163 +87,342 @@ def _search(self, q, tag, contact=None, access_ip=None, ports=None, vars=None):
                 q_list.append(self._friendly_return(item))
                 continue
 
-        # Run a tag search
-        if tag and tag in item.get('tags', list()):
-            q_list.append(self._friendly_return(item))
+        fuzzy = search_dict['fuzzy']['opt']
+        for k, v in search_dict.items():
+            if v['parent'] and v['opt']:
+                criteria = item.get(v['parent'], None)
+                if criteria:
+                    if isinstance(criteria, dict):
+                        criteria = criteria.keys()
+                    elif isinstance(criteria, set):
+                        criteria = list(criteria)
 
-        # Run a contact search
-        if contact and contact in item.get('contacts', dict()):
-            q_list.append(self._friendly_return(item))
+                    criteria = [i.lower() for i in criteria]
+                    if fuzzy:
+                        criteria = ' '.join(criteria)
 
-        # Run a access search
-        if access_ip and access_ip in item.get('access_ip', dict()):
-            q_list.append(self._friendly_return(item))
-
-        # Run a port search
-        if ports and ports in item.get('ports', dict()):
-            q_list.append(self._friendly_return(item))
-
-        # Run a port search
-        if vars and vars in item.get('vars', dict()):
-            q_list.append(self._friendly_return(item))
+                    if v['opt'].lower() in criteria:
+                        q_list.append(self._friendly_return(item))
     else:
         return q_list
 
 
-def _link_add(links, endpoint, end_id):
-    if endpoint.endswith(end_id):
-        links[end_id] = endpoint
-    else:
-        links[end_id] = '%s/%s' % (endpoint, end_id)
-    return links
-
-
-def _tags_add(new_tags, old_tags):
-    return set(list(new_tags) + list(old_tags))
-
-
-def put_device(self, ent_id, env_id, dev_id, args):
-    """PUT an entity.
-
-    :param self: object
-    :param ent_id: Entity ID
-    :type ent_id: string
-    :param env_id: Environment ID
-    :type env_id: string
-    :param args: Dictionary arguments
-    :type ent_id: dict
-    :param dev_id: Device ID
-    :type dev_id: string
-    :return: string, int
-    """
-    args['updated_at'] = datetime.datetime.utcnow()
-    try:
-        qe = models.Environments.objects(ent_id=ent_id, env_id=env_id)
-        if qe.if_exists():
-            q = models.Devices.objects(env_id=env_id, ent_id=ent_id, dev_id=dev_id)
-            if q.if_exists():
-                args['tags'] = _tags_add(old_tags=qe.get()['tags'], new_tags=args.pop('tags', list()))
-                q.update(**args)
-            else:
-                args['created_at'] = args['updated_at']
-                args['ent_id'] = ent_id
-                args['env_id'] = env_id
-                args['dev_id'] = dev_id
-                models.Devices.objects.create(**args)
-            # Post back a link within the entity to the new environment
-            links = _link_add(links=qe.get()['links'], endpoint=self.endpoint, end_id=dev_id)
-            if links:
-                qe.update(**{'links': links})
-    except Exception as exp:
-        return {'ERROR': str(exp)}, 400
-    else:
-        return self._friendly_return(args), 200
-
-
-def get_device(self, ent_id, env_id, dev_id):
+def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
     """Retrieve a list of entities.
 
-    :param self: object
-    :param ent_id: string
+    :param self: Class object
+    :type self: object || query
+    :param model: DB Model object
+    :type model: object || query
+    :param ent_id: Entity ID
+    :type ent_id: string
     :param env_id: Environment ID
     :type env_id: string
     :param dev_id: Device ID
     :type dev_id: string
     :return: list
     """
-    fuzzy = self.query.pop('fuzzy', False)
-    tag = self.query.pop('tag', None)
-    access_ip = self.query.pop('access_ip', None)
-    ports = self.query.pop('ports', None)
-    vars = self.query.pop('vars', None)
 
+    # This creates a single use search criteria hash which is used to look
+    #  inside a list or other hashable type.
+    search_dict = {
+        'fuzzy': {
+            'opt': self.query.pop('fuzzy', False),
+            'parent': None
+        },
+        'tag': {
+            'opt': self.query.pop('tag', None),
+            'parent': 'tags'
+        },
+        'access_ip': {
+            'opt': self.query.pop('access_ip', None),
+            'parent': 'access_ip'
+        },
+        'port': {
+            'opt': self.query.pop('port', None),
+            'parent': 'ports'
+        },
+        'var': {
+            'opt': self.query.pop('var', None),
+            'parent': 'vars'
+        },
+        'link': {
+            'opt': self.query.pop('link', None),
+            'parent': 'links'
+        },
+        'contact': {
+            'opt': self.query.pop('contact', None),
+            'parent': 'contacts'
+        }
+    }
+
+    lookup_params = dict()
+    if ent_id:
+        lookup_params['ent_id'] = ent_id
+    if env_id:
+        lookup_params['env_id'] = env_id
     if dev_id:
-        return [models.Devices.objects(ent_id=ent_id, env_id=env_id, dev_id=dev_id).get()]
-    elif fuzzy:
-        q = models.Devices.objects.filter(ent_id=ent_id, env_id=env_id).allow_filtering()
+        lookup_params['dev_id'] = dev_id
+
+    try:
+        if dev_id:
+            return [model.objects(**lookup_params).get()]
+        elif search_dict['fuzzy']['opt']:
+            q = model.objects.filter(**lookup_params).allow_filtering()
+        else:
+            lookup_params.update(self.query)
+            q = model.objects.filter(**lookup_params).allow_filtering()
+    except model.DoesNotExist as exp:
+        LOG.error(str(exp))
+        return list()
     else:
-        q = models.Devices.objects.filter(ent_id=ent_id, env_id=env_id, **self.query).allow_filtering()
+        return _search(
+            self=self,
+            q=q,
+            search_dict=search_dict
+        )
 
-    return _search(self=self, q=q, tag=tag, access_ip=access_ip, ports=ports, vars=vars)
 
+def get_device(self, ent_id, env_id, dev_id=None):
+    """Retrieve a list of entities.
 
-def put_environment(self, ent_id, env_id, args):
-    """PUT an entity.
-
-    :param self: object
+    :param self: Class object
+    :type self: object || query
     :param ent_id: Entity ID
     :type ent_id: string
     :param env_id: Environment ID
     :type env_id: string
-    :param ent_id: Dictionary arguments
-    :type ent_id: dict
-    :return: string, int
+    :param dev_id: Device ID
+    :type dev_id: string
+    :return: list
     """
-    args['updated_at'] = datetime.datetime.utcnow()
-    try:
-        qe = models.Entities.objects(ent_id=ent_id)
-        if qe.if_exists():
-            q = models.Environments.objects(env_id=env_id, ent_id=ent_id)
-            if q.if_exists():
-                args['tags'] = _tags_add(old_tags=qe.get()['tags'], new_tags=args.pop('tags', list()))
-                q.update(**args)
-            else:
-                args['created_at'] = args['updated_at']
-                args['ent_id'] = ent_id
-                args['env_id'] = env_id
-                models.Environments.objects.create(**args)
-            # Post back a link within the entity to the new environment
-            links = _link_add(links=qe.get()['links'], endpoint=self.endpoint, end_id=env_id)
-            if links:
-                qe.update(**{'links': links})
-    except Exception as exp:
-        return {'ERROR': str(exp)}, 400
-    else:
-        return self._friendly_return(args), 200
+    return _get_search(
+        self=self,
+        model=models.Devices,
+        ent_id=ent_id,
+        env_id=env_id,
+        dev_id=dev_id
+    )
 
 
 def get_environment(self, ent_id, env_id=None):
     """Retrieve a list of entities.
 
-    :param self: object
-    :param ent_id: string
+    :param self: Class object
+    :type self: object || query
+    :param ent_id: Entity ID
+    :type ent_id: string
     :param env_id: Environment ID
     :type env_id: string
     :return: list
     """
-    fuzzy = self.query.pop('fuzzy', False)
-    tag = self.query.pop('tag', None)
-    contact = self.query.pop('contact', None)
-    vars = self.query.pop('vars', None)
+    return _get_search(
+        self=self,
+        model=models.Environments,
+        ent_id=ent_id,
+        env_id=env_id
+    )
 
-    if env_id:
-        return [models.Environments.objects(ent_id=ent_id, env_id=env_id).get()]
-    elif fuzzy:
-        q = models.Environments.objects.filter(ent_id=ent_id).allow_filtering()
+
+def get_entity(self, ent_id):
+    """Retrieve a list of entities.
+
+    :param self: Class object
+    :type self: object || query
+    :param ent_id: Entity ID
+    :type ent_id: string
+    :return: list
+    """
+    return _get_search(
+        self=self,
+        model=models.Environments,
+        ent_id=ent_id
+    )
+
+
+def _put_item(args, query, ent_id=None, env_id=None, dev_id=None, update=False):
+    """PUT an item.
+
+    :param ent_id: Entity ID
+    :type ent_id: string
+    :param env_id: Environment ID
+    :type env_id: string
+    :param dev_id: Device ID
+    :type dev_id: string
+    :param args: Dictionary arguments
+    :type args: dict
+    :return: dict
+    """
+    args['updated_at'] = datetime.datetime.utcnow()
+    if update:
+        query.update(**args)
     else:
-        q = models.Environments.objects.filter(ent_id=ent_id, **self.query).allow_filtering()
+        args['created_at'] = args['updated_at']
+        if ent_id:
+            args['ent_id'] = ent_id
+        if env_id:
+            args['env_id'] = env_id
+        if dev_id:
+            args['dev_id'] = dev_id
+        models.Devices.objects.limit(1).create(**args)
+    return args
 
-    return _search(self=self, q=q, tag=tag, contact=contact, vars=vars)
+
+def _update_tags(query, args, model_exception):
+    """Coalesce tags
+
+    :param query: Class object
+    :type query: object || query
+    :param args: Dictionary arguments
+    :type args: dict
+    :param model_exception: Class object
+    :type model_exception: exception
+    :return:
+    """
+    try:
+        r_dev = query.get()
+        args['tags'] = set(list(r_dev['tags']) + list(args.pop('tags', list())))
+    except model_exception:
+        return args, False
+    else:
+        return args, True
+
+
+def _put_links(end_q, endpoint, end_id, args):
+    """PUT Links back.
+
+    :param end_q: Class object
+    :type end_q: object || query
+    :param endpoint: Environment ID
+    :type endpoint: string
+    :param end_id: Entity ID
+    :type end_id: string
+    :param args: Dictionary arguments
+    :type args: dict
+    """
+    # Post back a link within the entity to the new environment
+    links = end_q.get()['links']
+    if not links:
+        links = dict()
+
+    if endpoint.endswith(end_id):
+        links[end_id] = endpoint
+    else:
+        links[end_id] = '%s/%s' % (endpoint, end_id)
+
+    end_q.update(**{'links': links, 'updated_at': args['updated_at']})
+
+
+def put_device(self, ent_id, env_id, dev_id, args):
+    """PUT an entity.
+
+    :param self: Class object
+    :type self: object || query
+    :param ent_id: Entity ID
+    :type ent_id: string
+    :param env_id: Environment ID
+    :type env_id: string
+    :param dev_id: Device ID
+    :type dev_id: string
+    :param args: Dictionary arguments
+    :type args: dict
+    :return: string, int
+    """
+    try:
+        q_env = models.Environments.objects(
+            ent_id=ent_id,
+            env_id=env_id
+        ).limit(1)
+    except models.Environments.DoesNotExist:
+        return {'ERROR': 'Environment %s does not exist' % env_id}, 400
+
+    q_dev = models.Devices.objects(
+        env_id=env_id,
+        ent_id=ent_id,
+        dev_id=dev_id
+    ).limit(1)
+
+    args, update = _update_tags(
+        query=q_dev,
+        args=args,
+        model_exception=models.Devices.DoesNotExist
+    )
+
+    try:
+        # Write data to the backend
+        args = _put_item(
+            args=args,
+            query=q_dev,
+            ent_id=ent_id,
+            env_id=env_id,
+            dev_id=dev_id,
+            update=update
+        )
+
+        _put_links(
+            end_q=q_env,
+            endpoint=self.endpoint,
+            end_id=dev_id,
+            args=args
+        )
+    except Exception as exp:
+        return {'ERROR': str(exp)}, 400
+    else:
+        return self._friendly_return(args), 200
+
+
+def put_environment(self, ent_id, env_id, args):
+    """PUT an entity.
+
+    :param self: Class object
+    :type self: object || query
+    :param ent_id: Entity ID
+    :type ent_id: string
+    :param env_id: Environment ID
+    :type env_id: string
+    :param args: Dictionary arguments
+    :type args: dict
+    :return: string, int
+    """
+    try:
+        q_ent = models.Environments.objects(
+            ent_id=ent_id,
+            env_id=env_id
+        ).limit(1)
+    except models.Environments.DoesNotExist:
+        return {'ERROR': 'Entity %s does not exist' % ent_id}, 400
+
+    q_env = models.Environments.objects(
+        env_id=env_id,
+        ent_id=ent_id
+    ).limit(1)
+
+    args, update = _update_tags(
+        query=q_env,
+        args=args,
+        model_exception=models.Devices.DoesNotExist
+    )
+
+    try:
+        # Write data to the backend
+        args = _put_item(
+            args=args,
+            query=q_env,
+            ent_id=ent_id,
+            env_id=env_id,
+            update=update
+        )
+
+        _put_links(
+            end_q=q_ent,
+            endpoint=self.endpoint,
+            end_id=env_id,
+            args=args
+        )
+    except Exception as exp:
+        return {'ERROR': str(exp)}, 400
+    else:
+        return self._friendly_return(args), 200
 
 
 def put_entity(self, ent_id, args):
@@ -254,38 +435,25 @@ def put_entity(self, ent_id, args):
     :type ent_id: dict
     :return: string, int
     """
-    args['updated_at'] = datetime.datetime.utcnow()
+    q_ent = models.Entities.objects(
+        ent_id=ent_id
+    ).limit(1)
+
+    args, update = _update_tags(
+        query=q_ent,
+        args=args,
+        model_exception=models.Devices.DoesNotExist
+    )
+
     try:
-        q = models.Entities.objects(ent_id=ent_id).limit(None)
-        if q.if_exists():
-            args['tags'] = _tags_add(old_tags=q.get()['tags'], new_tags=args.pop('tags', list()))
-            q.update(**args)
-        else:
-            args['created_at'] = args['updated_at']
-            args['ent_id'] = ent_id
-            models.Entities.objects.create(**args)
+        # Write data to the backend
+        args = _put_item(
+            args=args,
+            query=q_ent,
+            ent_id=q_ent,
+            update=update
+        )
     except Exception as exp:
         return {'ERROR': str(exp)}, 400
     else:
         return self._friendly_return(args), 200
-
-
-def get_entity(self, ent_id):
-    """Retrieve a list of entities.
-
-    :param self: object
-    :param ent_id: string
-    :return: list
-    """
-    fuzzy = self.query.pop('fuzzy', False)
-    tag = self.query.pop('tag', None)
-    contact = self.query.pop('contact', None)
-
-    if ent_id:
-        return [models.Entities.objects(ent_id=ent_id).get()]
-    elif fuzzy:
-        q = models.Entities.objects.filter()
-    else:
-        q = models.Entities.objects.filter(**self.query)
-
-    return _search(self=self, q=q, tag=tag, contact=contact)

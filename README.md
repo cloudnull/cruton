@@ -66,7 +66,7 @@ port = 5150
 [data_store]
 username = cruton
 password = secrete
-cluster_node = 172.99.106.30
+cluster_node = 127.0.0.1
 port = 9042
 ```
 
@@ -218,7 +218,7 @@ curl --head 'http://127.0.0.1:5150/v1/entities'
 
 ###### POST one or many entities
 ``` bash
-curl -H 'Content-Type: application/json'  -D - -XPOST 'http://127.0.0.1:5150/v1/entities' -d '[{"ent_id": "Ent1", "tags": ["TestEntityTagOne",], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEntityOne"}, {"ent_id": "Ent2", "tags": ["TestEntityTagOne", "TestEntityTagTwo"], "contacts": {"person2": "email@person2.example.com"}, "name": "TestEntityTwo"}]'
+curl -H 'Content-Type: application/json'  -D - -XPOST 'http://127.0.0.1:5150/v1/entities' -d '[{"ent_id": "Ent1", "tags": ["TestEntityTagOne"], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEntityOne"}, {"ent_id": "Ent2", "tags": ["TestEntityTagOne", "TestEntityTagTwo"], "contacts": {"person2": "email@person2.example.com"}, "name": "TestEntityTwo"}]'
 ```
 
 ###### GET entities
