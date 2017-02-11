@@ -19,11 +19,15 @@ from flask_restful import reqparse
 
 from oslo_config import cfg
 
+from cruton import exceptions as exps
 from cruton.api import v1 as v1_api
+
+from oslo_log import log as logging
 
 
 CONF = cfg.CONF
 PARSER = reqparse.RequestParser(bundle_errors=True)
+LOG = logging.getLogger(__name__)
 
 
 class BaseEntity(v1_api.ApiSkel):
@@ -52,7 +56,9 @@ class BaseEntity(v1_api.ApiSkel):
         :return: list
         """
         return self.utils.get_entity(
-            self=self, ent_id=ent_id, **kwargs
+            self=self,
+            ent_id=ent_id,
+            **kwargs
         )
 
     def _put(self, ent_id=None, **kwargs):
@@ -85,6 +91,7 @@ class Entities(v1_api.ApiSkelRoot, BaseEntity):
         try:
             return jsonify(self._get())
         except Exception as exp:
+            LOG.error(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
 
     def head(self):
@@ -148,11 +155,17 @@ class Entity(v1_api.ApiSkelPath, BaseEntity):
         :return: Response || object
         """
         try:
-            return jsonify(self._friendly_return(self._get(ent_id=ent_id)[0]))
-        except self.exp.InvalidRequest:
+            ent = self._get(ent_id=ent_id)
+            if not ent:
+                return make_response(jsonify('Not Found'), 404)
+        except self.exp.InvalidRequest as exp:
+            LOG.error(exps.log_exception(exp))
             return make_response(jsonify('DoesNotExist'), 404)
         except Exception as exp:
+            LOG.critical(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
+        else:
+            return jsonify(self._friendly_return(ent[0]))
 
     def head(self, ent_id):
         """HEAD Entity.

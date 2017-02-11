@@ -25,6 +25,7 @@ from oslo_log import log as logging
 
 import models
 
+from cruton import exceptions as exps
 
 CONF = cfg.CONF
 LOG = logging.getLogger(__name__)
@@ -77,7 +78,10 @@ def _search(self, q, search_dict):
     """Search query results."""
     all_list = [dict(i.items()) for i in q.all()]
     if not any([i['opt'] for i in search_dict.values()]):
-        return [self._friendly_return(i) for i in all_list]
+        if all_list:
+            return [self._friendly_return(i) for i in all_list]
+        else:
+            return list()
 
     q_list = list()
     for item in all_list:
@@ -123,6 +127,15 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
     :return: list
     """
 
+    def run_query():
+        if lookup_params:
+            if fuzzy:
+                return model.objects.filter(**lookup_params).allow_filtering()
+            else:
+                return model.objects.filter(**lookup_params).allow_filtering()
+        else:
+            return model.objects()
+
     # This creates a single use search criteria hash which is used to look
     #  inside a list or other hashable type.
     search_dict = {
@@ -164,16 +177,15 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
     if dev_id:
         lookup_params['dev_id'] = dev_id
 
+    lookup_params.update(self.query)
+    fuzzy = search_dict['fuzzy']['opt'] is not False
+
     try:
+        q = run_query()
         if dev_id:
-            return [model.objects(**lookup_params).get()]
-        elif search_dict['fuzzy']['opt']:
-            q = model.objects.filter(**lookup_params).allow_filtering()
-        else:
-            lookup_params.update(self.query)
-            q = model.objects.filter(**lookup_params).allow_filtering()
+            return [q.get()]
     except model.DoesNotExist as exp:
-        LOG.error(str(exp))
+        LOG.warn(exps.log_exception(exp))
         return list()
     else:
         return _search(
@@ -235,7 +247,7 @@ def get_entity(self, ent_id):
     """
     return _get_search(
         self=self,
-        model=models.Environments,
+        model=models.Entities,
         ent_id=ent_id
     )
 
@@ -264,7 +276,7 @@ def _put_item(args, query, ent_id=None, env_id=None, dev_id=None, update=False):
             args['env_id'] = env_id
         if dev_id:
             args['dev_id'] = dev_id
-        models.Devices.objects.limit(1).create(**args)
+        query.create(**args)
     return args
 
 
@@ -282,7 +294,8 @@ def _update_tags(query, args, model_exception):
     try:
         r_dev = query.get()
         args['tags'] = set(list(r_dev['tags']) + list(args.pop('tags', list())))
-    except model_exception:
+    except (Exception, model_exception) as exp:
+        LOG.warn(exps.log_exception(exp))
         return args, False
     else:
         return args, True
@@ -300,17 +313,22 @@ def _put_links(end_q, endpoint, end_id, args):
     :param args: Dictionary arguments
     :type args: dict
     """
-    # Post back a link within the entity to the new environment
-    links = end_q.get()['links']
-    if not links:
-        links = dict()
+    try:
+        # Post back a link within the entity to the new environment
+        _links = end_q.get()
+        if not _links:
+            links = dict()
+        else:
+            links = _links['links']
 
-    if endpoint.endswith(end_id):
-        links[end_id] = endpoint
-    else:
-        links[end_id] = '%s/%s' % (endpoint, end_id)
+        if endpoint.endswith(end_id):
+            links[end_id] = endpoint
+        else:
+            links[end_id] = '%s/%s' % (endpoint, end_id)
 
-    end_q.update(**{'links': links, 'updated_at': args['updated_at']})
+        end_q.update(**{'links': links, 'updated_at': args['updated_at']})
+    except Exception:
+        pass
 
 
 def put_device(self, ent_id, env_id, dev_id, args):
@@ -330,11 +348,21 @@ def put_device(self, ent_id, env_id, dev_id, args):
     """
     try:
         q_env = models.Environments.objects(
-            ent_id=ent_id,
             env_id=env_id
         ).limit(1)
-    except models.Environments.DoesNotExist:
-        return {'ERROR': 'Environment %s does not exist' % env_id}, 400
+        q_env.get()
+    except models.Environments.DoesNotExist as exp:
+        LOG.warn(exps.log_exception(exp))
+        return {'ERROR': 'Environment [%s] was not found' % env_id}, 412
+
+    try:
+        q_ent = models.Entities.objects(
+            ent_id=ent_id
+        ).limit(1)
+        q_ent.get()
+    except models.Entities.DoesNotExist as exp:
+        LOG.critical(exps.log_exception(exp))
+        return {'ERROR': 'Entity [%s] was not found' % ent_id}, 412
 
     q_dev = models.Devices.objects(
         env_id=env_id,
@@ -366,6 +394,7 @@ def put_device(self, ent_id, env_id, dev_id, args):
             args=args
         )
     except Exception as exp:
+        LOG.critical(exps.log_exception(exp))
         return {'ERROR': str(exp)}, 400
     else:
         return self._friendly_return(args), 200
@@ -385,12 +414,13 @@ def put_environment(self, ent_id, env_id, args):
     :return: string, int
     """
     try:
-        q_ent = models.Environments.objects(
-            ent_id=ent_id,
-            env_id=env_id
+        q_ent = models.Entities.objects(
+            ent_id=ent_id
         ).limit(1)
-    except models.Environments.DoesNotExist:
-        return {'ERROR': 'Entity %s does not exist' % ent_id}, 400
+        q_ent.get()
+    except models.Entities.DoesNotExist as exp:
+        LOG.critical(exps.log_exception(exp))
+        return {'ERROR': 'Entity [%s] was not found' % ent_id}, 412
 
     q_env = models.Environments.objects(
         env_id=env_id,
@@ -420,6 +450,7 @@ def put_environment(self, ent_id, env_id, args):
             args=args
         )
     except Exception as exp:
+        LOG.critical(exps.log_exception(exp))
         return {'ERROR': str(exp)}, 400
     else:
         return self._friendly_return(args), 200
@@ -450,10 +481,11 @@ def put_entity(self, ent_id, args):
         args = _put_item(
             args=args,
             query=q_ent,
-            ent_id=q_ent,
+            ent_id=ent_id,
             update=update
         )
     except Exception as exp:
+        LOG.critical(exps.log_exception(exp))
         return {'ERROR': str(exp)}, 400
     else:
         return self._friendly_return(args), 200

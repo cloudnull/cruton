@@ -43,6 +43,8 @@ def main():
         )
     else:
         API.add_resource(api.DocRoot, '/')
+        logging.register_options(CONF)
+        logging.setup(CONF, 'cruton-api')
         CONF(project='cruton')
         return APP
 

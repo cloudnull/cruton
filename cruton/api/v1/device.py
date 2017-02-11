@@ -17,11 +17,18 @@
 from flask import jsonify, make_response, request
 from flask_restful import reqparse
 
+from oslo_config import cfg
+
+from cruton import exceptions as exps
 from cruton.api import v1 as v1_api
 from cruton.api.v1 import environment
 
+from oslo_log import log as logging
 
-PARSER = reqparse.RequestParser()
+
+CONF = cfg.CONF
+PARSER = reqparse.RequestParser(bundle_errors=True)
+LOG = logging.getLogger(__name__)
 
 
 class BaseDevice(environment.Environment):
@@ -136,11 +143,14 @@ class Device(BaseDevice, v1_api.ApiSkelPath):
                     self._get(ent_id=ent_id, env_id=env_id, dev_id=dev_id)[0]
                 )
             )
-        except IndexError:
+        except IndexError as exp:
+            LOG.warn(exps.log_exception(exp))
             return make_response(jsonify('Not Found'), 404)
-        except self.exp.InvalidRequest:
+        except self.exp.InvalidRequest as exp:
+            LOG.error(exps.log_exception(exp))
             return make_response(jsonify('Invalid Request'), 400)
         except Exception as exp:
+            LOG.critical(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
 
     def head(self, ent_id, env_id, dev_id=None):

@@ -14,6 +14,8 @@
 
 # (c) 2017, Kevin Carter <kevin.carter@rackspace.com>
 
+import traceback
+
 from oslo_log import log as logging
 
 
@@ -41,5 +43,18 @@ class _BaseException(Exception):
 
 class InvalidRequest(_BaseException):
     """Request was Invalid."""
-
     pass
+
+
+def log_exception(exp):
+    """Return log entries.
+
+    :param exp: Exception object
+    :type exp: string || object
+    :return: string
+    """
+    _trace = [i.strip() for i in str(traceback.format_exc()).splitlines()]
+    trace = ' -> '.join(_trace)
+    _exception = [i.strip() for i in str(exp).splitlines()]
+    exception = ' -> '.join(_exception)
+    return 'Exception [ %s ]: %s' % (exception, trace)

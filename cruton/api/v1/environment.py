@@ -17,11 +17,17 @@
 from flask import jsonify, make_response, request
 from flask_restful import reqparse
 
+from oslo_config import cfg
+from oslo_log import log as logging
+
 from cruton.api import v1 as v1_api
 from cruton.api.v1 import entity
+from cruton import exceptions as exps
 
 
-PARSER = reqparse.RequestParser()
+CONF = cfg.CONF
+PARSER = reqparse.RequestParser(bundle_errors=True)
+LOG = logging.getLogger(__name__)
 
 
 class BaseEnvironments(entity.BaseEntity):
@@ -123,9 +129,11 @@ class Environment(v1_api.ApiSkelPath, BaseEnvironments):
                     self._get(ent_id=ent_id, env_id=env_id)[0]
                 )
             )
-        except self.exp.InvalidRequest:
+        except self.exp.InvalidRequest as exp:
+            LOG.warn(exps.log_exception(exp))
             return make_response(jsonify('DoesNotExist'), 404)
         except Exception as exp:
+            LOG.critical(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
 
     def head(self, ent_id, env_id):
