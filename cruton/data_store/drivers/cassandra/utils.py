@@ -88,7 +88,6 @@ def convert_from_json(q_got):
 def _search(self, q, search_dict):
     """Search query results."""
     all_list = [convert_from_json(q_got=dict(i)) for i in q.all()]
-    print (all_list)
     if not any([i['opt'] for i in search_dict.values()]):
         if all_list:
             return [self._friendly_return(i) for i in all_list]
@@ -317,7 +316,7 @@ def _update_tags(query, args, model_exception):
         return args, True
 
 
-def _put_links(end_q, endpoint, end_id, args):
+def _put_links(end_q, endpoint, end_id, args, cluster_keys):
     """PUT Links back.
 
     :param end_q: Class object
@@ -329,22 +328,15 @@ def _put_links(end_q, endpoint, end_id, args):
     :param args: Dictionary arguments
     :type args: dict
     """
-    try:
-        # Post back a link within the entity to the new environment
-        _links = end_q.get()
-        if not _links:
-            links = dict()
-        else:
-            links = _links['links']
+    # Post back a link within the entity to the new environment
+    # links = end_q.get('links')
+    links = {}
+    if endpoint.endswith(end_id):
+        links[end_id] = endpoint
+    else:
+        links[end_id] = '%s/%s' % (endpoint, end_id)
 
-        if endpoint.endswith(end_id):
-            links[end_id] = endpoint
-        else:
-            links[end_id] = '%s/%s' % (endpoint, end_id)
-
-        end_q.update(**{'links': links, 'updated_at': args['updated_at']})
-    except Exception:
-        pass
+    end_q(**cluster_keys).update(**{'links': links, 'updated_at': args['updated_at']})
 
 
 def put_device(self, ent_id, env_id, dev_id, args):
@@ -395,7 +387,7 @@ def put_device(self, ent_id, env_id, dev_id, args):
     try:
         # Write data to the backend
         args = _put_item(
-            args=args,
+            args=self.convert(args),
             query=q_dev,
             ent_id=ent_id,
             env_id=env_id,
@@ -407,7 +399,8 @@ def put_device(self, ent_id, env_id, dev_id, args):
             end_q=q_env,
             endpoint=self.endpoint,
             end_id=dev_id,
-            args=args
+            args=args,
+            cluster_keys={'ent_id': ent_id}
         )
     except Exception as exp:
         LOG.critical(exps.log_exception(exp))
@@ -463,7 +456,8 @@ def put_environment(self, ent_id, env_id, args):
             end_q=q_ent,
             endpoint=self.endpoint,
             end_id=env_id,
-            args=args
+            args=args,
+            cluster_keys={}
         )
     except Exception as exp:
         LOG.critical(exps.log_exception(exp))
@@ -498,7 +492,7 @@ def put_entity(self, ent_id, args):
             args=args,
             query=q_ent,
             ent_id=ent_id,
-            update=update
+            update=update,
         )
     except Exception as exp:
         LOG.critical(exps.log_exception(exp))
