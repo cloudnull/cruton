@@ -1,4 +1,5 @@
 # Needed for testing
+ansible>=2.1
 flake8<2.6.0,>=2.5.4
 nose
 mock>=2.0

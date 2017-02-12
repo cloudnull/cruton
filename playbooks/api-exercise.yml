@@ -1,0 +1,321 @@
+---
+# Copyright 2017, Rackspace US, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: Cruton API Exercise
+  hosts: localhost
+  connection: local
+  tasks:
+## Entity tests
+    - name: HEAD an entity (does not exist)
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1NotFound"
+        method: "GET"
+        status_code: 404
+      tags:
+        - HEAD
+
+    - name: GET an entity (does not exist)
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1NotFound"
+        method: "GET"
+        status_code: 404
+      tags:
+        - GET
+
+    - name: PUT a new entity
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1"
+        method: "PUT"
+        body: '{"name": "TestEntity1"}'
+        body_format: "json"
+        status_code: 201
+      tags:
+        - PUT
+
+    - name: HEAD an entity
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1"
+        method: "GET"
+        status_code: 200
+      tags:
+        - HEAD
+
+    - name: GET an entity
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+
+    - name: POST new entities
+      uri:
+        url: "{{ api_endpoint }}/v1/entities"
+        method: "POST"
+        body: >
+          [{"ent_id": "TestEntity1A",
+            "tags": [
+              "TestEntityTagOne"
+            ],
+            "contacts": {
+              "person1": "4155551212",
+              "person2": "email@person2.example.com"
+            },
+            "name": "TestEntityOne"},
+           {"ent_id": "TestEntity1B",
+            "tags": [
+              "TestEntityTagOne",
+              "TestEntityTagTwo"
+            ],
+            "contacts": {
+              "person2": "email@person2.example.com"
+            },
+            "name": "TestEntityTwo"}]
+        body_format: "json"
+        status_code: 201
+      tags:
+        - POST
+
+    - name: HEAD entities
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/{{ item }}"
+        method: "HEAD"
+        status_code: 200
+      with_items:
+        - TestEntity1A
+        - TestEntity1B
+      tags:
+        - HEAD
+
+    - name: GET an entity using search
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments?contact=person1"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+
+    - name: GET an entity using a fuzzy search
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments?contact=person&fuzzy=true"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+
+
+## Environmental tests
+    - name: HEAD an environment (does not exist)
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1NotFound"
+        method: "GET"
+        status_code: 404
+      tags:
+        - HEAD
+
+    - name: GET an environment (does not exist)
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1NotFound"
+        method: "GET"
+        status_code: 404
+      tags:
+        - GET
+
+    - name: PUT a new environment
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1"
+        method: "PUT"
+        body: '{"name": "TestEnvironment1"}'
+        body_format: "json"
+        status_code: 201
+      tags:
+        - PUT
+
+    - name: HEAD an environment
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1"
+        method: "GET"
+        status_code: 200
+      tags:
+        - HEAD
+
+    - name: GET an environment
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+
+    - name: POST new environments
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments"
+        method: "POST"
+        body: >
+          [{"env_id": "TestEnvironment1A",
+            "tags": [
+              "TestEnvironmentTagOne"
+            ],
+            "contacts": {
+              "person1": "4155551212",
+              "person2": "email@person2.example.com"
+            },
+            "name": "TestEnvironmentOne"},
+            {"env_id": "TestEnvironment1B",
+             "tags": [
+               "TestEnvironmentTagOne",
+               "TestEnvironmentTagTwo"
+             ],
+             "contacts": {
+               "person1": "4155551212"
+             },
+             "name": "TestEnvironmentTwo"}]
+        body_format: "json"
+        status_code: 201
+      tags:
+        - POST
+
+    - name: HEAD environments
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/{{ item }}"
+        method: "HEAD"
+        status_code: 200
+      with_items:
+        - TestEnvironment1A
+        - TestEnvironment1B
+      tags:
+        - HEAD
+
+    - name: GET an environment using search
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments?contact=person1"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+
+    - name: GET an environment using a fuzzy search
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments?contact=person&fuzzy=true"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+
+
+## Device tests
+    - name: HEAD a device (does not exist)
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/TestDevice1NotFound"
+        method: "GET"
+        status_code: 404
+      tags:
+        - HEAD
+
+    - name: GET a device (does not exist)
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/TestDevice1NotFound"
+        method: "GET"
+        status_code: 404
+      tags:
+        - GET
+
+    - name: PUT a new device
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/TestDevice1"
+        method: "PUT"
+        body: '{"name": "TestDevice1"}'
+        body_format: "json"
+        status_code: 201
+      tags:
+        - PUT
+
+    - name: HEAD a device
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/TestDevice1"
+        method: "GET"
+        status_code: 200
+      tags:
+        - HEAD
+
+    - name: GET a device
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/TestDevice1"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+
+    - name: POST new devices
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices"
+        method: "POST"
+        body: >
+          [{"dev_id": "TestDevice1A",
+            "tags": [
+              "TestEnvironmentTagOne"
+            ],
+            "access_ip": {
+              "drac": "172.16.24.1",
+              "mgmt": "fe80::6656:fc1d:cd1:ddba"
+            },
+            "rack_id": "TestRack1",
+            "row_id": "TestRow1",
+            "name": "TestDevice1A"},
+           {"dev_id": "TestDevice1B",
+            "tags": [
+              "TestDeviceTagOne",
+              "TestDeviceTagTwo"
+            ],
+            "access_ip": {
+              "drac": "172.16.24.2",
+              "mgmt": "fe80::6656:fc1d:cd1:ddbb"
+            },
+            "rack_id": "TestRack2",
+            "row_id": "TestRow1",
+            "name": "TestDevice1B"}]
+        body_format: "json"
+        status_code: 201
+      tags:
+        - POST
+
+    - name: HEAD devices
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/{{ item }}"
+        method: "HEAD"
+        status_code: 200
+      with_items:
+        - TestDevice1A
+        - TestDevice1B
+      tags:
+        - HEAD
+
+    - name: GET a device using search
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices?tags=TestEnvironmentTagOne"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+
+    - name: GET a device using a fuzzy search
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices?tags=environment&fuzzy=true"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
+  vars:
+    api_endpoint: "http://127.0.0.1:5150"

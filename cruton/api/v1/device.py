@@ -157,14 +157,16 @@ class Device(BaseDevice, v1_api.ApiSkelPath):
         resp = make_response()
         dev = self._get(ent_id=ent_id, env_id=env_id, dev_id=dev_id)
         if not len(dev) > 0:
-            resp.headers['Content-Device-Exists'] = False
+            resp.headers['Content-Environment-Exists'] = False
+            resp.status_code = 404
         else:
             device = dev[0]
-            resp.headers['Content-Device-Exists'] = True
-            resp.headers['Content-Device-Last-Updated'] = device['updated_at']
-            resp.headers['Content-Device-Created'] = device['created_at']
-            resp.headers['Content-Device-uuid'] = device['id']
-            resp.headers['Content-Device-Description'] = device['description']
+            resp.headers['Content-Environment-Exists'] = True
+            resp.headers['Content-Environment-Last-Updated'] = device['updated_at']
+            resp.headers['Content-Environment-Created'] = device['created_at']
+            resp.headers['Content-Environment-uuid'] = device['id']
+            resp.headers['Content-Environment-Description'] = device['description']
+            resp.status_code = 200
         return resp
 
     def put(self, ent_id, env_id, dev_id=None):

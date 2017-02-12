@@ -160,7 +160,7 @@ class Entity(v1_api.ApiSkelPath, BaseEntity):
                 return make_response(jsonify('Not Found'), 404)
         except self.exp.InvalidRequest as exp:
             LOG.error(exps.log_exception(exp))
-            return make_response(jsonify('DoesNotExist'), 404)
+            return make_response(jsonify('Does Not Exist'), 404)
         except Exception as exp:
             LOG.critical(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
@@ -168,17 +168,19 @@ class Entity(v1_api.ApiSkelPath, BaseEntity):
             return jsonify(self._friendly_return(ent[0]))
 
     def head(self, ent_id):
-        """HEAD Entity.
-
-        A response will be returned containing headers with the current
-        entity count.
-
-        :param ent_id: Entity ID
-        :type ent_id: string
-        :return: Response || object
-        """
         resp = make_response()
-        resp.headers['Content-Entity-Exists'] = len(self._get(ent_id=ent_id)) > 0
+        dev = self._get(ent_id=ent_id)
+        if not len(dev) > 0:
+            resp.headers['Content-Entity-Exists'] = False
+            resp.status_code = 404
+        else:
+            device = dev[0]
+            resp.headers['Content-Entity-Exists'] = True
+            resp.headers['Content-Entity-Last-Updated'] = device['updated_at']
+            resp.headers['Content-Entity-Created'] = device['created_at']
+            resp.headers['Content-Entity-uuid'] = device['id']
+            resp.headers['Content-Entity-Description'] = device['description']
+            resp.status_code = 200
         return resp
 
     def put(self, ent_id):

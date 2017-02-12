@@ -124,21 +124,36 @@ class Environment(v1_api.ApiSkelPath, BaseEnvironments):
 
     def get(self, ent_id, env_id):
         try:
-            return jsonify(
-                self._friendly_return(
-                    self._get(ent_id=ent_id, env_id=env_id)[0]
+            get_env = self._get(ent_id=ent_id, env_id=env_id)
+            if get_env:
+                return jsonify(
+                    self._friendly_return(
+                        get_env[0]
+                    )
                 )
-            )
+            else:
+                return make_response(jsonify('Does Not Exist'), 404)
         except self.exp.InvalidRequest as exp:
             LOG.warn(exps.log_exception(exp))
-            return make_response(jsonify('DoesNotExist'), 404)
+            return make_response(jsonify('Does Not Exist'), 404)
         except Exception as exp:
             LOG.critical(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
 
     def head(self, ent_id, env_id):
         resp = make_response()
-        resp.headers['Content-Environment-Exists'] = len(self._get(ent_id=ent_id, env_id=env_id)) > 0
+        dev = self._get(ent_id=ent_id, env_id=env_id)
+        if not len(dev) > 0:
+            resp.headers['Content-Environment-Exists'] = False
+            resp.status_code = 404
+        else:
+            device = dev[0]
+            resp.headers['Content-Environment-Exists'] = True
+            resp.headers['Content-Environment-Last-Updated'] = device['updated_at']
+            resp.headers['Content-Environment-Created'] = device['created_at']
+            resp.headers['Content-Environment-uuid'] = device['id']
+            resp.headers['Content-Environment-Description'] = device['description']
+            resp.status_code = 200
         return resp
 
     def put(self, ent_id, env_id):
