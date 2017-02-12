@@ -28,10 +28,14 @@
           {% set _ = node_post.update({'ports': {}}) %}
           {% set ports_set = node_post['ports'] %}
           {% for k, v in hostvars[inventory_hostname].items() %}
-          {%   if k.startswith('ansible') and v is string %}
-          {%     set _ = var_set.update({k.replace('ansible_', '').strip(): v.strip()}) %}
-          {%   elif k.startswith('ansible') and v is mapping %}
-          {%     set _ = var_set.update({k.replace('ansible_', '').strip(): v}) %}
+          {%   if not k.startswith('ansible') %}
+          {%     if v is string %}
+          {%       set _ = var_set.update({k.replace('ansible_', '').strip(): v.strip()}) %}
+          {%     elif v is mapping or v is iterable %}
+          {%       set _ = var_set.update({k.replace('ansible_', '').strip(): v}) %}
+          {%     else %}
+          {%       set _ = var_set.update({k.replace('ansible_', '').strip(): v | string}) %}
+          {%     endif %}
           {%   endif %}
           {% endfor %}
           {% set _ = node_post.update({'name': ansible_hostname}) %}
@@ -51,6 +55,7 @@
         body_format: "json"
         status_code: 201
   vars:
-    api_endpoint: "http://127.0.0.1"
+    api_endpoint: "http://127.0.0.1:5150"
     api_entity: "EntityOne"
     api_environment: "EnvironmentOne"
+
