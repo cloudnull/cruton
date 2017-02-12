@@ -96,7 +96,7 @@ cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
 
 ### Data Model
 
-The data model is broken up into a simple hierarchy allowing for effective tracking of resources.
+The data model is broken up into a simple hierarchy allowing for effective tracking of resources. Everything in the data models can be used as search criteria.
 
 The top level is an "Entity". Within an Entity basic data covering an "owner" is stored.
 
