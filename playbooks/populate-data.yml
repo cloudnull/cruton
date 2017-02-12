@@ -31,12 +31,7 @@
           {%   if k.startswith('ansible') and v is string %}
           {%     set _ = var_set.update({k.replace('ansible_', '').strip(): v.strip()}) %}
           {%   elif k.startswith('ansible') and v is mapping %}
-          {%     if 'device' in v and 'pciid' in v %}
-          {%       set _ = ports_set.update({v['device'].strip(): v['pciid'].strip()}) %}
-          {%     endif %}
-          {%     if 'device' in v and 'ipv4' in v %}
-          {%       set _ = access_ip_set.update({v['device'].strip(): v['ipv4']['address'].strip()}) %}
-          {%     endif %}
+          {%     set _ = var_set.update({k.replace('ansible_', '').strip(): v}) %}
           {%   endif %}
           {% endfor %}
           {% set _ = node_post.update({'name': ansible_hostname}) %}
