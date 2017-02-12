@@ -1,0 +1,25 @@
+version: '3'
+services:
+  cassandra:
+    image: 'cassandra:latest'
+    ports:
+      - '7000:7000'
+      - '7001:7001'
+      - '9042:9042'
+      - '9160:9160'
+    volumes:
+      - 'cassandra_data:/var/lib/cassandra'
+  cruton:
+    build: .
+    command: cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
+    ports:
+      - '5150:5150'
+    links:
+      - cassandra
+    depends_on:
+      - cassandra
+    volumes:
+      - ./etc/cruton/cruton.ini:/etc/cruton/cruton.ini
+volumes:
+  cassandra_data:
+    driver: local

@@ -33,6 +33,19 @@ GRANT ALL ON KEYSPACE cruton TO cruton;
 
 ----
 
+## Development via Docker
+You can just build the cruton docker container by running the following command.
+``` bash
+docker build -t cloudnull/cruton .
+```
+
+To sync tables example
+``` bash
+docker run -ti -v ${PWD}/example:/etc/cruton -p 5150:5150 cloudnull/cruton cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
+```
+
+----
+
 ## Installation of Cruton.
 
 Installing the base system requirements
