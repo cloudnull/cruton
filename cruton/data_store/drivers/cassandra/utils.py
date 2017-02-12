@@ -277,7 +277,7 @@ def _put_item(args, query, ent_id=None, env_id=None, dev_id=None, update=False):
     :return: dict
     """
     for k, v in args.get('vars', {}).items():
-        if isinstance(v, dict):
+        if isinstance(v, (dict, list)):
             args['vars'][k] = json.dumps(v)
 
     args['updated_at'] = datetime.datetime.utcnow()
