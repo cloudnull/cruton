@@ -19,39 +19,54 @@
     - name: Building a variable map
       no_log: true
       set_fact:
-        ansible_vars: >-
-          {% set node_post = {} %}
-          {% set _ = node_post.update({'vars': {}}) %}
-          {% set var_set = node_post['vars'] %}
-          {% set _ = node_post.update({'access_ip': {}}) %}
-          {% set access_ip_set = node_post['access_ip'] %}
-          {% set _ = node_post.update({'ports': {}}) %}
-          {% set ports_set = node_post['ports'] %}
+        ansible_cruton_host_vars: >-
+          {% set cruton_ansible_host_vars = {} %}
+          {% set _ = cruton_ansible_host_vars.update({'vars': {}}) %}
+          {% set var_set = cruton_ansible_host_vars['vars'] %}
+          {% set _ = cruton_ansible_host_vars.update({'access_ip': {}}) %}
+          {% set access_ip_set = cruton_ansible_host_vars['access_ip'] %}
+          {% set _ = cruton_ansible_host_vars.update({'ports': {}}) %}
+          {% set ports_set = cruton_ansible_host_vars['ports'] %}
           {% for k, v in hostvars[inventory_hostname].items() %}
-          {%   if not k.startswith('ansible') %}
+          {%   if k.startswith('ansible') %}
           {%     if v is string %}
-          {%       set _ = var_set.update({k.replace('ansible_', '').strip(): v.strip()}) %}
+          {%       if 'ssh' not in k and 'password' not in k and 'key' not in k and 'token' not in k and 'credential' not in k %}
+          {%         set _ = var_set.update({k.strip(): v.strip()}) %}
+          {%       endif %}
+          {%     elif v is mapping %}
+          {%       if 'device' in v and 'pciid' in v %}
+          {%         set _ = ports_set.update({v['device'].strip(): v['pciid'].strip()}) %}
+          {%       endif %}
+          {%       if 'device' in v and 'ipv4' in v %}
+          {%         set _ = access_ip_set.update({v['device'].strip(): v['ipv4']['address'].strip()}) %}
+          {%       endif %}
+          {%     endif %}
+          {%   else %}
+          {%     if v is string %}
+          {%       if 'ssh' not in k and 'password' not in k and 'key' not in k and 'token' not in k and 'credential' not in k %}
+          {%         set _ = var_set.update({k.strip(): v | string}) %}
+          {%       endif %}
           {%     elif v is mapping or v is iterable %}
-          {%       set _ = var_set.update({k.replace('ansible_', '').strip(): v}) %}
+          {%       set _ = var_set.update({k.strip(): v}) %}
           {%     else %}
-          {%       set _ = var_set.update({k.replace('ansible_', '').strip(): v | string}) %}
+          {%       set _ = var_set.update({k.strip(): v | string}) %}
           {%     endif %}
           {%   endif %}
           {% endfor %}
-          {% set _ = node_post.update({'name': ansible_hostname}) %}
-          {% set _ = node_post.update({'dev_id': ansible_hostname}) %}
-          {{ node_post }}
+          {% set _ = cruton_ansible_host_vars.update({'name': ansible_hostname}) %}
+          {% set _ = cruton_ansible_host_vars.update({'dev_id': ansible_hostname}) %}
+          {{ cruton_ansible_host_vars }}
 
-    - name: Running variable cleanup
+    - name: Running host variable cleanup
       no_log: true
       set_fact:
-        cruton_vars: "[{{ ansible_vars.strip() }}]"
+        cruton_host_vars: "[{{ ansible_cruton_host_vars.strip() }}]"
 
-    - name: Posting to the cruton API
+    - name: POST to the cruton API
       uri:
         url: "{{ api_endpoint }}/v1/entities/{{ api_entity }}/environments/{{ api_environment }}/devices"
         method: "POST"
-        body: '{{ cruton_vars | to_json }}'
+        body: '{{ cruton_host_vars | to_json }}'
         body_format: "json"
         status_code: 201
   vars:
