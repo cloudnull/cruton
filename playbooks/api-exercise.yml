@@ -304,7 +304,7 @@
 
     - name: GET a device using search
       uri:
-        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices?tags=TestEnvironmentTagOne"
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices?tag=TestEnvironmentTagOne"
         method: "GET"
         status_code: 200
       tags:
@@ -312,7 +312,7 @@
 
     - name: GET a device using a fuzzy search
       uri:
-        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices?tags=environment&fuzzy=true"
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices?tag=environment&fuzzy=true"
         method: "GET"
         status_code: 200
       tags:

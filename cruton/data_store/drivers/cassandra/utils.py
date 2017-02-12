@@ -15,6 +15,7 @@
 # (c) 2017, Kevin Carter <kevin.carter@rackspace.com>
 
 import datetime
+import json
 
 import cassandra
 from cassandra.cqlengine import connection
@@ -74,9 +75,20 @@ def setup():
     return connection
 
 
+def convert_from_json(q_got):
+    for k, v in q_got.get('vars', {}).items():
+        try:
+            q_got['vars'][k] = json.loads(v)
+        except ValueError:
+            pass
+    else:
+        return q_got
+
+
 def _search(self, q, search_dict):
     """Search query results."""
-    all_list = [dict(i.items()) for i in q.all()]
+    all_list = [convert_from_json(q_got=dict(i)) for i in q.all()]
+    print (all_list)
     if not any([i['opt'] for i in search_dict.values()]):
         if all_list:
             return [self._friendly_return(i) for i in all_list]
@@ -183,8 +195,8 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
     try:
         q = run_query()
         if dev_id:
-            return [q.get()]
-    except model.DoesNotExist as exp:
+            return [convert_from_json(q_got=dict(q.get()))]
+    except Exception as exp:
         LOG.warn(exps.log_exception(exp))
         return list()
     else:
@@ -265,6 +277,10 @@ def _put_item(args, query, ent_id=None, env_id=None, dev_id=None, update=False):
     :type args: dict
     :return: dict
     """
+    for k, v in args.get('vars', {}).items():
+        if isinstance(v, dict):
+            args['vars'][k] = json.dumps(v)
+
     args['updated_at'] = datetime.datetime.utcnow()
     if update:
         query.update(**args)
@@ -294,7 +310,7 @@ def _update_tags(query, args, model_exception):
     try:
         r_dev = query.get()
         args['tags'] = set(list(r_dev['tags']) + list(args.pop('tags', list())))
-    except (Exception, model_exception) as exp:
+    except Exception as exp:
         LOG.warn(exps.log_exception(exp))
         return args, False
     else:

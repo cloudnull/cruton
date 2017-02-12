@@ -119,7 +119,7 @@ class Devices(CrutonBaseModel):
     vars = cql.columns.Map(
         default=dict(),
         key_type=cql.columns.Text(),
-        value_type=cql.columns.Text()
+        value_type=cql.columns.Blob()
     )
 
 

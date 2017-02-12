@@ -15,6 +15,7 @@
 # (c) 2017, Kevin Carter <kevin.carter@rackspace.com>
 
 import datetime
+import collections
 
 from flask import jsonify, make_response, request
 from flask_restful import Resource
@@ -65,6 +66,18 @@ class ApiSkel(Resource):
 
         for k, v in request.args.items():
             self.query[k] = v
+        self.query = self.convert(data=self.query)
+        self.args = self.convert(data=self.args)
+
+    def convert(self, data):
+        if isinstance(data, basestring):
+            return str(data)
+        elif isinstance(data, collections.Mapping):
+            return dict(map(self.convert, data.iteritems()))
+        elif isinstance(data, collections.Iterable):
+            return type(data)(map(self.convert, data))
+        else:
+            return data
 
     def set_kwargs(self, kwargs):
         """Dynamically set objects into the class using the provided kwargs"""

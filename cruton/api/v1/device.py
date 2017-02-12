@@ -138,11 +138,9 @@ class Device(BaseDevice, v1_api.ApiSkelPath):
 
     def get(self, ent_id, env_id, dev_id=None):
         try:
-            return jsonify(
-                self._friendly_return(
-                    self._get(ent_id=ent_id, env_id=env_id, dev_id=dev_id)[0]
-                )
-            )
+            dev = self._get(ent_id=ent_id, env_id=env_id, dev_id=dev_id)
+            if not dev:
+                return make_response(jsonify('Does Not Exist'), 404)
         except IndexError as exp:
             LOG.warn(exps.log_exception(exp))
             return make_response(jsonify('Not Found'), 404)
@@ -152,6 +150,12 @@ class Device(BaseDevice, v1_api.ApiSkelPath):
         except Exception as exp:
             LOG.critical(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
+        else:
+            return jsonify(
+                self._friendly_return(
+                    dev[0]
+                )
+            )
 
     def head(self, ent_id, env_id, dev_id=None):
         resp = make_response()

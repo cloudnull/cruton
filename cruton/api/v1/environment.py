@@ -124,14 +124,8 @@ class Environment(v1_api.ApiSkelPath, BaseEnvironments):
 
     def get(self, ent_id, env_id):
         try:
-            get_env = self._get(ent_id=ent_id, env_id=env_id)
-            if get_env:
-                return jsonify(
-                    self._friendly_return(
-                        get_env[0]
-                    )
-                )
-            else:
+            env = self._get(ent_id=ent_id, env_id=env_id)
+            if not env:
                 return make_response(jsonify('Does Not Exist'), 404)
         except self.exp.InvalidRequest as exp:
             LOG.warn(exps.log_exception(exp))
@@ -139,6 +133,12 @@ class Environment(v1_api.ApiSkelPath, BaseEnvironments):
         except Exception as exp:
             LOG.critical(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
+        else:
+            return jsonify(
+                self._friendly_return(
+                    env[0]
+                )
+            )
 
     def head(self, ent_id, env_id):
         resp = make_response()
