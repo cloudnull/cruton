@@ -34,6 +34,7 @@ GRANT ALL ON KEYSPACE cruton TO cruton;
 ----
 
 ## Development via Docker
+
 You can just build the cruton docker container by running the following command.
 ``` bash
 docker build -t cloudnull/cruton .
@@ -63,7 +64,7 @@ virtualenv cruton
 pip install cruton
 
 # You could also install this package using git
-pip install git+https://github.com/cloudnull/cruton
+# pip install git+https://github.com/cloudnull/cruton
 ````
 
 Once the package is installed create the configuration file for the API. The assumed location of this file will be ``/etc/cruton``.
@@ -97,13 +98,14 @@ cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
 
 The data model is broken up into a simple hierarchy allowing for effective tracking of resources.
 
-The top level is an "Entity". Within an Entity basic data covering owner is stored.
+The top level is an "Entity". Within an Entity basic data covering an "owner" is stored.
 
 ``` cql
 CREATE TABLE cruton.entities (
     ent_id text PRIMARY KEY,
     contacts map<text, text>,
     created_at timestamp,
+    description text,
     id uuid,
     links map<text, text>,
     name text,
@@ -127,7 +129,7 @@ CREATE INDEX entities_id_idx ON cruton.entities (id);
 CREATE INDEX entities_name_idx ON cruton.entities (name);
 ```
 
-The next level is the Environments which contains general information about the environment.
+The next level is the Environments which contains general information about the environment which resources are will be deployed under.
 
 ``` cql
 CREATE TABLE cruton.environments (
@@ -135,6 +137,7 @@ CREATE TABLE cruton.environments (
     ent_id text,
     contacts map<text, text>,
     created_at timestamp,
+    description text,
     id uuid,
     links map<text, text>,
     name text,
@@ -171,16 +174,17 @@ CREATE TABLE cruton.devices (
     access_ip map<text, inet>,
     asset_id text,
     created_at timestamp,
+    description text,
     id uuid,
     links map<text, text>,
     name text,
-    ports map<text, int>,
+    ports map<text, text>,
     rack_id text,
     row_id text,
     tags set<text>,
     units int,
     updated_at timestamp,
-    vars map<text, text>,
+    vars map<text, blob>,
     PRIMARY KEY (dev_id, env_id, ent_id)
 ) WITH CLUSTERING ORDER BY (env_id ASC, ent_id ASC)
     AND bloom_filter_fp_chance = 0.1
@@ -210,14 +214,20 @@ The typical API process can be envoked by running the ``cruton-api-wsgi --config
 If you need or want to run the API in debug mode you can do so by invoking the ``cruton-api-debug --config-file /etc/cruton/cruton.ini``
 command.
 
-### Entities
 
-###### Discovery
+### Discovery
 ```bash
 curl 'http://127.0.0.1:5150/dicovery'
 ```
 The API endpoints and all available actions are discoverable. The dicovery endpoint allows the a user or an
 application to discover all available actions for all available versions.
+
+### Entities
+
+###### HEAD all entities
+```
+curl --head 'http://127.0.0.1:5150/v1/entities'
+```
 
 ###### PUT an entity
 ``` bash
@@ -226,10 +236,10 @@ curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/en
 
 ###### HEAD an entities
 ```
-curl --head 'http://127.0.0.1:5150/v1/entities'
+curl --head 'http://127.0.0.1:5150/v1/entities/Solo1'
 ```
 
-###### POST one or many entities
+###### POST one or many entities (bulk import)
 ``` bash
 curl -H 'Content-Type: application/json'  -D - -XPOST 'http://127.0.0.1:5150/v1/entities' -d '[{"ent_id": "Ent1", "tags": ["TestEntityTagOne"], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEntityOne"}, {"ent_id": "Ent2", "tags": ["TestEntityTagOne", "TestEntityTagTwo"], "contacts": {"person2": "email@person2.example.com"}, "name": "TestEntityTwo"}]'
 ```
@@ -253,18 +263,24 @@ You should be aware that **ANY** field in the data module can be part of the sea
 
 ### Environments
 
-###### PUT an environment
-``` bash
-curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1' -d '{"name": "SoloEnvironmentOne"}'
-```
-
-###### HEAD environments
+###### HEAD all environments
 ``` bash
 # HEAD environments root
 curl --head 'http://127.0.0.1:5150/v1/entities/Ent1/environments'
 ```
 
-###### POST one or many environments
+###### PUT an environment
+``` bash
+curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1' -d '{"name": "SoloEnvironmentOne"}'
+```
+
+###### HEAD an environment
+``` bash
+# HEAD environments root
+curl --head 'http://127.0.0.1:5150/v1/entities/Ent1/environments/SoloEnv1'
+```
+
+###### POST one or many environments (bulk import)
 ``` bash
 curl -H 'Content-Type: application/json' -D - -XPOST 'http://127.0.0.1:5150/v1/entities/Ent1/environments' -d '[{"env_id": "Env1", "tags": ["TestEnvironmentTagOne"], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEnvironmentOne"}, {"env_id": "Env2", "tags": ["TestEnvironmentTagOne", "TestEnvironmentTagTwo"], "contacts": {"person1": "4155551212"}, "name": "TestEnvironmentTwo"}]'
 ```
@@ -288,6 +304,11 @@ You should be aware that **ANY** field in the data module can be part of the sea
 
 ### Devices
 
+###### HEAD all devices
+``` bash
+curl --head http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices
+```
+
 ###### PUT a device
 ``` bash
 curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices/SoloDev1' -d '{"name": "SoloDeviceOne"}'
@@ -298,7 +319,7 @@ curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/en
 curl --head http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices/SoloDev1
 ```
 
-###### POST one or many devices
+###### POST one or many devices (bulk import)
 ``` bash
 curl -H 'Content-Type: application/json' -D - -XPOST 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices' -d '[{"dev_id": "Dev1", "tags": ["TestEnvironmentTagOne"], "access_ip": {"drac": "172.16.24.1", "mgmt": "fe80::6656:fc1d:cd1:ddba"}, "rack_id": "TestRack1", "row_id": "TestRow1", "name": "TestDeviceOne"}, {"dev_id": "Dev2", "tags": ["TestDeviceTagOne", "TestDeviceTagTwo"], "access_ip": {"drac": "172.16.24.2", "mgmt": "fe80::6656:fc1d:cd1:ddbb"}, "rack_id": "TestRack2", "row_id": "TestRow1", "name": "TestDeviceTwo"}]'
 ```
@@ -318,3 +339,9 @@ curl 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices?row_
 curl 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices?name=Test&fuzzy=true'
 ```
 You should be aware that **ANY** field in the data module can be part of the search criteria.
+
+----
+
+### Utilities
+
+Automated data population can be simply done using an Ansible playbook. [More on helpful playbooks can be found here](playbooks/README.md)
