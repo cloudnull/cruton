@@ -85,38 +85,34 @@ def convert_from_json(q_got):
         return q_got
 
 
-def _search(self, q, search_dict):
+def _search(self, q, search_dict, lookup_params):
     """Search query results."""
-    all_list = [convert_from_json(q_got=dict(i)) for i in q.all()]
-    if not any([i['opt'] for i in search_dict.values()]):
-        if all_list:
-            return [self._friendly_return(i) for i in all_list]
-        else:
-            return list()
-
     q_list = list()
+    for k, v in search_dict.items():
+        if v['parent'] and v['opt']:
+            lookup_params[v['parent']] = v['opt']
+
+    all_list = [convert_from_json(q_got=dict(i)) for i in q.all()]
+    fuzzy = search_dict['fuzzy']['opt']
     for item in all_list:
-        for k, v in self.query.items():
-            query_str = item.get(k)
-            if query_str and v in query_str:
-                q_list.append(self._friendly_return(item))
-                continue
+        for param, criteria in lookup_params.items():
+            query_item = item.get(param)
+            print(param, criteria, query_item)
+            if query_item:
+                if criteria == query_item:
+                    q_list.append(self._friendly_return(item))
+                    break
+                elif fuzzy:
+                    if isinstance(query_item, dict):
+                        query_item_list = [i.lower() for i in query_item.keys()]
+                    elif isinstance(query_item, set):
+                        query_item_list = [i.lower() for i in list(query_item)]
+                    else:
+                        query_item_list = [query_item]
 
-        fuzzy = search_dict['fuzzy']['opt']
-        for k, v in search_dict.items():
-            if v['parent'] and v['opt']:
-                criteria = item.get(v['parent'], None)
-                if criteria:
-                    if isinstance(criteria, dict):
-                        criteria = criteria.keys()
-                    elif isinstance(criteria, set):
-                        criteria = list(criteria)
-
-                    criteria = [i.lower() for i in criteria]
-                    if fuzzy:
-                        criteria = ' '.join(criteria)
-
-                    if v['opt'].lower() in criteria:
+                    if criteria in ' '.join(query_item_list):
+                        q_list.append(self._friendly_return(item))
+                    elif criteria in query_item_list:
                         q_list.append(self._friendly_return(item))
     else:
         return q_list
@@ -188,12 +184,11 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
     if dev_id:
         lookup_params['dev_id'] = dev_id
 
-    lookup_params.update(self.query)
     fuzzy = search_dict['fuzzy']['opt'] is not False
 
     try:
         q = run_query()
-        if dev_id:
+        if dev_id and not fuzzy:
             return [convert_from_json(q_got=dict(q.get()))]
     except Exception as exp:
         LOG.warn(exps.log_exception(exp))
@@ -202,7 +197,8 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
         return _search(
             self=self,
             q=q,
-            search_dict=search_dict
+            search_dict=search_dict,
+            lookup_params=self.query
         )
 
 

@@ -47,6 +47,11 @@ V1_API_MAP = {
         'path': 'cruton.api.v1.environment',
         'uri': '/v1/entities/<ent_id>/environments'
     },
+    'device_ipxe': {
+        'module': 'Ipxe',
+        'path': 'cruton.api.v1.device',
+        'uri': '/v1/entities/<ent_id>/environments/<env_id>/devices/<dev_id>/ipxe'
+    },
     'device': {
         'module': 'Device',
         'path': 'cruton.api.v1.device',
