@@ -317,5 +317,13 @@
         status_code: 200
       tags:
         - GET
+
+    - name: GET an IPXE return for a device
+      uri:
+        url: "{{ api_endpoint }}/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/TestDevice1A/ipxe"
+        method: "GET"
+        status_code: 200
+      tags:
+        - GET
   vars:
     api_endpoint: "http://127.0.0.1:5150"

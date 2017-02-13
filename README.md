@@ -340,6 +340,13 @@ curl 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices?name
 ```
 You should be aware that **ANY** field in the data module can be part of the search criteria.
 
+###### GET an IPXE return for a specific device
+``` bash
+curl 'http://127.0.0.1:5150/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/TestDevice1A/ipxe"
+```
+
+If a device has an has variable with "ipxe_" as the prefix the ipxe endpoint will return an ipxe config using those variables.
+
 ----
 
 ### Utilities

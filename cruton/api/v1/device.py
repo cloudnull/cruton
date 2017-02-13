@@ -250,4 +250,7 @@ class Ipxe(BaseDevice, v1_api.ApiSkelPath):
                 if k.startswith('ipxe'):
                     ipxe_vars[k.replace('ipxe_', '')] = v
             else:
-                return Response(render_template_string(IPXE, ipxe_vars=ipxe_vars), mimetype='text/xml')
+                return Response(
+                    render_template_string(IPXE, ipxe_vars=ipxe_vars),
+                    mimetype='text/plain'
+                )
