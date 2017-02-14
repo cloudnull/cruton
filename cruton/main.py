@@ -32,7 +32,7 @@ API = Api(APP)
 LOG = logging.getLogger(__name__)
 
 
-def main():
+def main(debug=False):
     for k, v, in api.API_MAP.items():
         API.add_resource(
             cruton.dynamic_import(
@@ -46,12 +46,11 @@ def main():
         logging.register_options(CONF)
         logging.setup(CONF, 'cruton-api')
         CONF(project='cruton')
-        return APP
+        APP.run(debug=debug, **CONF['api'])
 
 
 def debug():
-    main()
-    APP.run(debug=True, **CONF['api'])
+    main(debug=True)
 
 
 if __name__ == '__main__':

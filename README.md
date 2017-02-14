@@ -51,7 +51,7 @@ docker run -ti -v ${PWD}/example:/etc/cruton -p 5150:5150 cloudnull/cruton cruto
 
 Installing the base system requirements
 ``` bash
-apt-get install -y python-dev build-essential
+apt-get install -y python-dev build-essential libssl-dev
 ```
 
 Installing the python source code.
