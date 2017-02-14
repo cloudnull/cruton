@@ -140,7 +140,7 @@ def deep_search(data_structure, criteria, fuzzy=False):
     return False
 
 
-def _search(self, q, search_dict, lookup_params):
+def _search(self, q, search_dict, lookup_params, fuzzy):
     """Search query results."""
     q_list = list()
     for k, v in search_dict.items():
@@ -148,8 +148,11 @@ def _search(self, q, search_dict, lookup_params):
             lookup_params[v['parent']] = v['opt']
 
     all_list = [convert_from_json(q_got=dict(i)) for i in q.all()]
-    fuzzy = search_dict['fuzzy']['opt']
     for item in all_list:
+        if not lookup_params:
+            q_list.append(self._friendly_return(item))
+            continue
+
         for k, v in lookup_params.items():
             q_item = item.get(k)
             if q_item:
@@ -188,10 +191,6 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
     # This creates a single use search criteria hash which is used to look
     #  inside a list or other hashable type.
     search_dict = {
-        'fuzzy': {
-            'opt': self.query.pop('fuzzy', False),
-            'parent': None
-        },
         'tag': {
             'opt': self.query.pop('tag', None),
             'parent': 'tags'
@@ -222,11 +221,10 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
     if dev_id:
         lookup_params['dev_id'] = dev_id
 
-    fuzzy = search_dict['fuzzy']['opt'] is not False
-
+    fuzzy = self.query.pop('fuzzy', False)
     try:
         q = run_query()
-        if dev_id and not fuzzy:
+        if any([ent_id, env_id, dev_id]) and not fuzzy:
             return [convert_from_json(q_got=dict(q.get()))]
     except Exception as exp:
         LOG.warn(exps.log_exception(exp))
@@ -235,8 +233,9 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
         return _search(
             self=self,
             q=q,
-            search_dict=search_dict,
-            lookup_params=self.query
+            search_dict=dict([(v['parent'], v['opt']) for k, v in search_dict.items() if v['opt']]),
+            lookup_params=self.query,
+            fuzzy=fuzzy
         )
 
 

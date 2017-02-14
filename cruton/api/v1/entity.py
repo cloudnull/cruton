@@ -89,7 +89,11 @@ class Entities(v1_api.ApiSkelRoot, BaseEntity):
         :return: Response || object
         """
         try:
-            return jsonify(self._get())
+            get_ent = self._get()
+            if get_ent:
+                return jsonify(get_ent)
+            else:
+                make_response('Not Found', 404)
         except Exception as exp:
             LOG.error(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)

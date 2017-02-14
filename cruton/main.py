@@ -14,6 +14,8 @@
 
 # (c) 2017, Kevin Carter <kevin.carter@rackspace.com>
 
+import os
+
 from flask import Flask
 from flask_restful import Api
 
@@ -31,8 +33,12 @@ APP.config.update(PROPAGATE_EXCEPTIONS=True)
 API = Api(APP)
 LOG = logging.getLogger(__name__)
 
+DEFAULT_CONFIG_FILE = []
+if os.path.exists('/etc/cruton/cruton.ini'):
+    DEFAULT_CONFIG_FILE.append('/etc/cruton/cruton.ini')
 
-def main(debug=False):
+
+def init_application():
     for k, v, in api.API_MAP.items():
         API.add_resource(
             cruton.dynamic_import(
@@ -45,12 +51,17 @@ def main(debug=False):
         API.add_resource(api.DocRoot, '/')
         logging.register_options(CONF)
         logging.setup(CONF, 'cruton-api')
-        CONF(project='cruton')
-        APP.run(debug=debug, **CONF['api'])
+        CONF(
+            project='cruton',
+            version=cruton.__version__,
+            default_config_files=DEFAULT_CONFIG_FILE
+        )
+        APP.config.update(CONF['api'])
+        return APP
 
 
 def debug():
-    main(debug=True)
+    return init_application().run(debug=True, **CONF['api'])
 
 
 if __name__ == '__main__':
