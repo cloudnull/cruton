@@ -1,0 +1,135 @@
+---
+# Copyright 2017, Rackspace US, Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+- name: Cruton API Deploy
+  hosts: cruton_api
+  tasks:
+    - name: create additional groups
+      group:
+        name: "{{ item }}"
+        state: "present"
+        system: "yes"
+      with_items:
+        - cruton
+        - ssl_cert
+
+    - name: Create the keystone system user
+      user:
+        name: "cruton"
+        group: "cruton"
+        groups: "ssl_cert"
+        comment: "Cruton User"
+        shell: "/bin/bash"
+        system: "yes"
+        createhome: "yes"
+        home: "/var/lib/cruton"
+        generate_ssh_key: "yes"
+
+    - name: Install distro packages
+      package:
+        name: "{{ item }}"
+        state: "latest"
+      register: install_packages
+      until: install_packages | success
+      retries: 5
+      delay: 2
+      with_items:
+        - python-dev
+        - build-essential
+
+    - name: Install pip packages
+      pip:
+        name: "{{ cruton_pip_package }}"
+        state: "latest"
+        virtualenv: "/opt/cruton"
+        virtualenv_site_packages: "no"
+
+    - name: Ensure uWSGI directory exists
+      file:
+        path: "/etc/uwsgi/"
+        state: directory
+        mode: "0711"
+
+    - name: Apply uWSGI configuration
+      copy:
+        src: "{{ playbook_dir }}/../etc/wsgi/cruton-wsgi.ini"
+        dest: "/etc/uwsgi/cruton-wsgi.ini"
+        mode: "0744"
+
+    - name: Configure custom nginx log format
+      lineinfile:
+        insertbefore: access_log
+        dest: "/etc/nginx/nginx.conf"
+        line: "log_format custom '{{ nginx_access_log_format_combined }} {{ nginx_access_log_format_extras }}';"
+
+    - name: Configure virtual hosts
+      copy:
+        src: "{{ playbook_dir }}/../etc/wsgi/cruton-nginx.conf"
+        dest: "/etc/nginx/sites-available/cruton.conf"
+
+    - name: Link to enable virtual hosts
+      file:
+        src: "/etc/nginx/sites-available/cruton.conf"
+        path: "/etc/nginx/sites-enabled/cruton.conf"
+        state: link
+
+    - name: Create Keystone TEMP dirs
+      file:
+        path: "{{ item.path }}/cruton"
+        state: directory
+        owner: "cruton"
+        group: "cruton"
+        mode: "02755"
+      with_items:
+        - { path: "/var/run" }
+        - { path: "/var/lock" }
+
+    - name: Create tempfile.d entry
+      copy:
+        content: |
+          D /var/lock/cruton 2755 cruton cruton
+          D /var/run/cruton 2755 cruton cruton
+        dest: "/etc/tmpfiles.d/cruton.conf"
+        mode: "0644"
+        owner: "root"
+        group: "root"
+
+    - name: Place the systemd init script
+      copy:
+        src: "{{ playbook_dir }}/../etc/wsgi/cruton-uwsgi-systemd.ini"
+        dest: "/etc/systemd/system/cruton.service"
+        mode: "0644"
+        owner: "root"
+        group: "root"
+      register: systemd_init
+
+    - name: Reload the systemd daemon
+      command: "systemctl daemon-reload"
+      when: systemd_init | changed
+
+    - name: Load service
+      service:
+       name: "cruton-api"
+       enabled: "yes"
+
+    - name: Load service
+      service:
+       name: "nginx"
+       enabled: "yes"
+
+  vars:
+    cruton_pip_package: "{{ playbook_dir }}../"
+    nginx_access_log_format_combined: '$remote_addr - $remote_user [$time_local] "$request" $status $body_bytes_sent "$http_referer" "$http_user_agent"'
+    nginx_access_log_format_extras: '$request_time $upstream_response_time'

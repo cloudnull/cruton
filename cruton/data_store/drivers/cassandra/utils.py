@@ -15,6 +15,7 @@
 # (c) 2017, Kevin Carter <kevin.carter@rackspace.com>
 
 import datetime
+import re
 import json
 
 import cassandra
@@ -76,6 +77,12 @@ def setup():
 
 
 def convert_from_json(q_got):
+    """Return a dict from a JSON variable.
+
+    :param q_got: retrieved query
+    :type q_got: ``dict``
+    :return: dict
+    """
     for k, v in q_got.get('vars', {}).items():
         try:
             q_got['vars'][k] = json.loads(v)
@@ -83,6 +90,54 @@ def convert_from_json(q_got):
             pass
     else:
         return q_got
+
+
+def deep_search(data_structure, criteria, fuzzy=False):
+    """Recursively merge new_items into base_items.
+
+    This search function will dive through most data structures and look
+    hte provided criteria. If the criteria is found the function will
+    return True otherwise it will return False.
+
+    :param data_structure: Data structure to search through.
+    :param criteria: Item to search for.
+    :param fuzzy: Enables or disables a fuzzy search.
+    :returns: ``bool``
+    """
+    def _criteria_in_value(c, v):
+        if fuzzy:
+            try:
+                c = c.lower()
+                v = v.lower()
+                return c == v or c in v
+            except (TypeError, AttributeError):
+                pass
+        else:
+            return c == v
+
+    if isinstance(data_structure, (list, set, tuple)):
+        for item in data_structure:
+            if deep_search(data_structure=item, criteria=criteria, fuzzy=fuzzy):
+                return True
+    elif isinstance(data_structure, dict):
+        for key, value in data_structure.items():
+            if isinstance(value, (dict, list, set, tuple)):
+                if deep_search(data_structure=value, criteria=criteria, fuzzy=fuzzy):
+                    return True
+            elif not isinstance(value, int) and (',' in value or '\n' in value):
+                values = [i.lower() for i in re.split(',|\n', value) if i]
+                if deep_search(data_structure=values, criteria=criteria, fuzzy=fuzzy):
+                    return True
+            elif isinstance(value, int):
+                if criteria == value:
+                    return True
+            else:
+                if _criteria_in_value(c=criteria, v=value):
+                    return True
+    else:
+        if _criteria_in_value(c=criteria, v=data_structure):
+            return True
+    return False
 
 
 def _search(self, q, search_dict, lookup_params):
@@ -95,25 +150,12 @@ def _search(self, q, search_dict, lookup_params):
     all_list = [convert_from_json(q_got=dict(i)) for i in q.all()]
     fuzzy = search_dict['fuzzy']['opt']
     for item in all_list:
-        for param, criteria in lookup_params.items():
-            query_item = item.get(param)
-            print(param, criteria, query_item)
-            if query_item:
-                if criteria == query_item:
+        for k, v in lookup_params.items():
+            q_item = item.get(k)
+            if q_item:
+                if deep_search(data_structure=q_item, criteria=v, fuzzy=fuzzy):
                     q_list.append(self._friendly_return(item))
                     break
-                elif fuzzy:
-                    if isinstance(query_item, dict):
-                        query_item_list = [i.lower() for i in query_item.keys()]
-                    elif isinstance(query_item, set):
-                        query_item_list = [i.lower() for i in list(query_item)]
-                    else:
-                        query_item_list = [query_item]
-
-                    if criteria in ' '.join(query_item_list):
-                        q_list.append(self._friendly_return(item))
-                    elif criteria in query_item_list:
-                        q_list.append(self._friendly_return(item))
     else:
         return q_list
 
@@ -153,10 +195,6 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
         'tag': {
             'opt': self.query.pop('tag', None),
             'parent': 'tags'
-        },
-        'access_ip': {
-            'opt': self.query.pop('access_ip', None),
-            'parent': 'access_ip'
         },
         'port': {
             'opt': self.query.pop('port', None),
@@ -291,15 +329,13 @@ def _put_item(args, query, ent_id=None, env_id=None, dev_id=None, update=False):
     return args
 
 
-def _update_tags(query, args, model_exception):
+def _update_tags(query, args):
     """Coalesce tags
 
     :param query: Class object
     :type query: object || query
     :param args: Dictionary arguments
     :type args: dict
-    :param model_exception: Class object
-    :type model_exception: exception
     :return:
     """
     try:
@@ -376,8 +412,7 @@ def put_device(self, ent_id, env_id, dev_id, args):
 
     args, update = _update_tags(
         query=q_dev,
-        args=args,
-        model_exception=models.Devices.DoesNotExist
+        args=args
     )
 
     try:
@@ -434,8 +469,7 @@ def put_environment(self, ent_id, env_id, args):
 
     args, update = _update_tags(
         query=q_env,
-        args=args,
-        model_exception=models.Devices.DoesNotExist
+        args=args
     )
 
     try:
@@ -478,8 +512,7 @@ def put_entity(self, ent_id, args):
 
     args, update = _update_tags(
         query=q_ent,
-        args=args,
-        model_exception=models.Devices.DoesNotExist
+        args=args
     )
 
     try:

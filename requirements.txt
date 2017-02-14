@@ -13,3 +13,4 @@ cassandra-driver>=3.7.1
 oslo.context>=2.9.0
 oslo.config!=3.18.0,>=3.14.0
 oslo.log>=3.11.0
+uWSGI>=2.0.14
