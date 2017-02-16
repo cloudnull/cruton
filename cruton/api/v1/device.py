@@ -197,38 +197,13 @@ class Device(BaseDevice, v1_api.ApiSkelPath):
             return notice, 201
 
 
-class Ipxe(BaseDevice, v1_api.ApiSkelPath):
+class Ipxe(Device):
     """Specific environment, datacenter, row, rack, and host devices endpoint."""
 
     def __init__(self):
         """TODO"""
         super(Ipxe, self).__init__()
         self._dev_id = None
-
-    @property
-    def dev_id(self):
-        """Host Identification
-
-        :param host_id: Host ID
-        :type host_id: string
-        """
-        return self._dev_id
-
-    def head(self, ent_id, env_id, dev_id=None):
-        resp = make_response()
-        dev = self._get(ent_id=ent_id, env_id=env_id, dev_id=dev_id)
-        if not len(dev) > 0:
-            resp.headers['Content-Environment-Exists'] = False
-            resp.status_code = 404
-        else:
-            device = dev[0]
-            resp.headers['Content-Environment-Exists'] = True
-            resp.headers['Content-Environment-Last-Updated'] = device['updated_at']
-            resp.headers['Content-Environment-Created'] = device['created_at']
-            resp.headers['Content-Environment-uuid'] = device['id']
-            resp.headers['Content-Environment-Description'] = device['description']
-            resp.status_code = 200
-        return resp
 
     def get(self, ent_id, env_id, dev_id=None):
         try:

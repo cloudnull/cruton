@@ -72,9 +72,21 @@ class Environments(v1_api.ApiSkelRoot, BaseEnvironments):
 
     def get(self, ent_id):
         try:
-            return jsonify(self._get(ent_id=ent_id))
+            env = self._get(ent_id=ent_id)
+            if not env:
+                return make_response(jsonify('Does Not Exist'), 404)
+        except self.exp.InvalidRequest as exp:
+            LOG.warn(exps.log_exception(exp))
+            return make_response(jsonify('Does Not Exist'), 404)
         except Exception as exp:
+            LOG.critical(exps.log_exception(exp))
             return make_response(jsonify(str(exp)), 400)
+        else:
+            return jsonify(
+                self._friendly_return(
+                    env[0]
+                )
+            )
 
     def head(self, ent_id):
         resp = make_response()
