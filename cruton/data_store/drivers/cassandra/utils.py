@@ -140,12 +140,13 @@ def deep_search(data_structure, criteria, fuzzy=False):
     return False
 
 
-def _search(self, q, search_dict, lookup_params, fuzzy):
+def _search(self, q, search_items, lookup_params, fuzzy):
     """Search query results."""
     q_list = list()
-    for k, v in search_dict.items():
-        if v['parent'] and v['opt']:
-            lookup_params[v['parent']] = v['opt']
+    for k, v in search_items:
+        print('SHIT', k, v)
+        if v:
+            lookup_params[k] = v
 
     all_list = [convert_from_json(q_got=dict(i)) for i in q.all()]
     for item in all_list:
@@ -233,7 +234,7 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
         return _search(
             self=self,
             q=q,
-            search_dict=dict([(v['parent'], v['opt']) for k, v in search_dict.items() if v['opt']]),
+            search_items=[(v['parent'], v['opt']) for k, v in search_dict.items() if v['opt']],
             lookup_params=self.query,
             fuzzy=fuzzy
         )
