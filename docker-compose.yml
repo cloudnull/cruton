@@ -7,11 +7,14 @@ services:
       - '7001:7001'
       - '9042:9042'
       - '9160:9160'
+    container_name: cassandra_cruton
     volumes:
       - 'cassandra_data:/var/lib/cassandra'
   cruton:
     build: .
-    command: cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
+    command: cruton-api-wsgi --port 5150
+    environment:
+      CASSANDRA:  
     ports:
       - '5150:5150'
     links:
