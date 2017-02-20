@@ -144,7 +144,6 @@ def _search(self, q, search_items, lookup_params, fuzzy):
     """Search query results."""
     q_list = list()
     for k, v in search_items:
-        print('SHIT', k, v)
         if v:
             lookup_params[k] = v
 
@@ -225,8 +224,6 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
     fuzzy = self.query.pop('fuzzy', False)
     try:
         q = run_query()
-        if any([ent_id, env_id, dev_id]) and not fuzzy:
-            return [convert_from_json(q_got=dict(q.get()))]
     except Exception as exp:
         LOG.warn(exps.log_exception(exp))
         return list()
@@ -234,7 +231,10 @@ def _get_search(self, model, ent_id=None, env_id=None, dev_id=None):
         return _search(
             self=self,
             q=q,
-            search_items=[(v['parent'], v['opt']) for k, v in search_dict.items() if v['opt']],
+            search_items=[
+                (v['parent'], v['opt']) for k, v in search_dict.items()
+                if v['opt']
+            ],
             lookup_params=self.query,
             fuzzy=fuzzy
         )
