@@ -1,208 +1,76 @@
 ![Cruton](docs/pics/cruton-logo.jpg)
 
-### Rebaked environmental device management system
+# Rebaked environmental device management system
 
-Environmental device management system built for hundreds of entities, thousands environments, and millions of devices.
+Environmental inventory(device) management system built for hundreds of entities, thousands environments, and millions of devices.
+<!-- TOC -->
 
-----
+- [Rebaked environmental device management system](#rebaked-environmental-device-management-system)
+    - [Quick getting started development guide](#quick-getting-started-development-guide)
+        - [Build a cruton container](#build-a-cruton-container)
+        - [Start cruton and cassandra](#start-cruton-and-cassandra)
+        - [Create **keyspace** where the tables will be created.](#create-keyspace-where-the-tables-will-be-created)
+        - [Sync the tables](#sync-the-tables)
+    - [Working with the API.](#working-with-the-api)
+        - [Discovery](#discovery)
+        - [Entities](#entities)
+                - [HEAD all entities](#head-all-entities)
+                - [PUT an entity](#put-an-entity)
+                - [HEAD an entities](#head-an-entities)
+                - [POST one or many entities (bulk import)](#post-one-or-many-entities-bulk-import)
+                - [GET entities](#get-entities)
+                - [GET entities and search](#get-entities-and-search)
+                - [GET entities and search doing a partial match using provided criteria](#get-entities-and-search-doing-a-partial-match-using-provided-criteria)
+        - [Environments](#environments)
+                - [HEAD all environments](#head-all-environments)
+                - [PUT an environment](#put-an-environment)
+                - [HEAD an environment](#head-an-environment)
+                - [POST one or many environments (bulk import)](#post-one-or-many-environments-bulk-import)
+                - [GET environments](#get-environments)
+                - [GET environments and search](#get-environments-and-search)
+                - [GET environments and search doing a partial match using provided criteria](#get-environments-and-search-doing-a-partial-match-using-provided-criteria)
+    - [Devices](#devices)
+                - [HEAD all devices](#head-all-devices)
+                - [PUT a device](#put-a-device)
+                - [HEAD a device](#head-a-device)
+                - [POST one or many devices (bulk import)](#post-one-or-many-devices-bulk-import)
+                - [GET devices](#get-devices)
+                - [GET devices and search](#get-devices-and-search)
+                - [GET devices and search doing a partial matching using provided criteria](#get-devices-and-search-doing-a-partial-matching-using-provided-criteria)
+                - [GET an IPXE return for a specific device](#get-an-ipxe-return-for-a-specific-device)
+    - [Utilities](#utilities)
+        - [Synchronizing the table space with the backend store.](#synchronizing-the-table-space-with-the-backend-store)
 
-## Creating the **role** and **keyspace** where the tables will be created.
-
-This system requires access to a cassandra backend
-
-###### You can create access restrictions like so.
-
-``` cql
-CREATE ROLE IF NOT EXISTS cruton WITH PASSWORD = 'secrete' AND LOGIN = true ;
-```
-
-If you have the AllowAllAuthenticator backend enabled you better have a good reason, otherwise it's likely you're doing
-it wrong. [See for more on setting up internal authentication](http://docs.datastax.com/en/archived/datastax_enterprise/4.0/datastax_enterprise/sec/secConfiguringInternalAuthentication.html#secConfiuringInternalAuthentication__secConfiuringInternalAuthentication)
-
-###### Create the keyspace.
-
-``` cql
-CREATE KEYSPACE IF NOT EXISTS "cruton" WITH REPLICATION = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1};
-```
-
-###### Grant ALL permissions to the use for the created keyspace
-
-``` cql
-GRANT ALL ON KEYSPACE cruton TO cruton;
-```
-
-----
-
-## Development via Docker
-
-You can just build the cruton docker container by running the following command.
-``` bash
-docker build -t cloudnull/cruton .
-```
-
-To sync tables example
-``` bash
-docker run -ti -v ${PWD}/example:/etc/cruton -p 5150:5150 cloudnull/cruton cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
-```
+<!-- /TOC -->
 
 ----
+## Quick getting started development guide
 
-## Installation of Cruton.
+The following guide will result in a running cruton application.
 
-Installing the base system requirements
+Requirements:
+ * docker
+ * docker-compose
+
+### Build a cruton container
+```
+docker-compose build
+```
+
+### Start cruton and cassandra
+```
+docker-compose up
+```
+
+### Create **keyspace** where the tables will be created.
+This setup creates a basic cassandra container with no authentication needed. So we don't need to create a user with a password. We do howerver need to createa keyspace.
 ``` bash
-apt-get install -y python-dev build-essential libssl-dev
+docker exec -ti cassandra_cruton cqlsh localhost -e "CREATE KEYSPACE IF NOT EXISTS "cruton" WITH REPLICATION = {'class': 'NetworkTopologyStrategy', 'datacenter1': 1};"
 ```
 
-Installing the python source code.
-``` bash
-# Create a python virtual environment and activate the venv
-virtualenv cruton
-. cruton/bin/activate
-
-# Install the python package.
-pip install cruton
-
-# You could also install this package using git
-# pip install git+https://github.com/cloudnull/cruton
-````
-
-Once the package is installed create the configuration file for the API. The assumed location of this file will be ``/etc/cruton``.
-
-``` ini
-[DEFAULT]
-driver = cassandra
-
-[api]
-host = 0.0.0.0
-port = 5150
-
-[data_store]
-username = cruton
-password = secrete
-cluster_node = 127.0.0.1
-port = 9042
+### Sync the tables
 ```
-
-----
-
-## Synchronizing the table space with the backend store.
-
-``` bash
-cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
-```
-
-----
-
-### Data Model
-
-The data model is broken up into a simple hierarchy allowing for effective tracking of resources. Everything in the data models can be used as search criteria.
-
-The top level is an "Entity". Within an Entity basic data covering an "owner" is stored.
-
-``` cql
-CREATE TABLE cruton.entities (
-    ent_id text PRIMARY KEY,
-    contacts map<text, text>,
-    created_at timestamp,
-    description text,
-    id uuid,
-    links map<text, text>,
-    name text,
-    tags set<text>,
-    updated_at timestamp
-) WITH bloom_filter_fp_chance = 0.1
-    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy', 'sstable_size_in_mb': '128'}
-    AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND crc_check_chance = 1.0
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = '99PERCENTILE';
-CREATE INDEX entities_id_idx ON cruton.entities (id);
-CREATE INDEX entities_name_idx ON cruton.entities (name);
-```
-
-The next level is the Environments which contains general information about the environment which resources are will be deployed under.
-
-``` cql
-CREATE TABLE cruton.environments (
-    env_id text,
-    ent_id text,
-    contacts map<text, text>,
-    created_at timestamp,
-    description text,
-    id uuid,
-    links map<text, text>,
-    name text,
-    tags set<text>,
-    updated_at timestamp,
-    vars map<text, text>,
-    PRIMARY KEY (env_id, ent_id)
-) WITH CLUSTERING ORDER BY (ent_id ASC)
-    AND bloom_filter_fp_chance = 0.1
-    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy', 'sstable_size_in_mb': '128'}
-    AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND crc_check_chance = 1.0
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = '99PERCENTILE';
-CREATE INDEX environments_id_idx ON cruton.environments (id);
-CREATE INDEX environments_name_idx ON cruton.environments (name);
-```
-
-The final level is the Devices which contains everything that will be tracked.
-
-``` cql
-CREATE TABLE cruton.devices (
-    dev_id text,
-    env_id text,
-    ent_id text,
-    access_ip map<text, inet>,
-    asset_id text,
-    created_at timestamp,
-    description text,
-    id uuid,
-    links map<text, text>,
-    name text,
-    ports map<text, text>,
-    rack_id text,
-    row_id text,
-    tags set<text>,
-    units int,
-    updated_at timestamp,
-    vars map<text, blob>,
-    PRIMARY KEY (dev_id, env_id, ent_id)
-) WITH CLUSTERING ORDER BY (env_id ASC, ent_id ASC)
-    AND bloom_filter_fp_chance = 0.1
-    AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}
-    AND comment = ''
-    AND compaction = {'class': 'org.apache.cassandra.db.compaction.LeveledCompactionStrategy', 'sstable_size_in_mb': '128'}
-    AND compression = {'chunk_length_in_kb': '64', 'class': 'org.apache.cassandra.io.compress.LZ4Compressor'}
-    AND crc_check_chance = 1.0
-    AND dclocal_read_repair_chance = 0.1
-    AND default_time_to_live = 0
-    AND gc_grace_seconds = 864000
-    AND max_index_interval = 2048
-    AND memtable_flush_period_in_ms = 0
-    AND min_index_interval = 128
-    AND read_repair_chance = 0.0
-    AND speculative_retry = '99PERCENTILE';
-CREATE INDEX devices_id_idx ON cruton.devices (id);
-CREATE INDEX devices_name_idx ON cruton.devices (name);
+docker exec -ti  cruton_cruton_1 cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
 ```
 
 ----
@@ -224,37 +92,37 @@ application to discover all available actions for all available versions.
 
 ### Entities
 
-###### HEAD all entities
+##### HEAD all entities
 ```
 curl --head 'http://127.0.0.1:5150/v1/entities'
 ```
 
-###### PUT an entity
+##### PUT an entity
 ``` bash
 curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1' -d '{"name": "TestEntitySolo"}'
 ```
 
-###### HEAD an entities
+##### HEAD an entities
 ```
 curl --head 'http://127.0.0.1:5150/v1/entities/Solo1'
 ```
 
-###### POST one or many entities (bulk import)
+##### POST one or many entities (bulk import)
 ``` bash
 curl -H 'Content-Type: application/json'  -D - -XPOST 'http://127.0.0.1:5150/v1/entities' -d '[{"ent_id": "Ent1", "tags": ["TestEntityTagOne"], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEntityOne"}, {"ent_id": "Ent2", "tags": ["TestEntityTagOne", "TestEntityTagTwo"], "contacts": {"person2": "email@person2.example.com"}, "name": "TestEntityTwo"}]'
 ```
 
-###### GET entities
+##### GET entities
 ``` bash
 curl 'http://127.0.0.1:5150/v1/entities'
 ````
 
-###### GET entities and search
+##### GET entities and search
 ``` bash
 curl -D - 'http://127.0.0.1:5150/v1/entities?contact=person1'
 ```
 
-###### GET entities and search doing a partial match using provided criteria
+##### GET entities and search doing a partial match using provided criteria
 ``` bash
 curl -D - 'http://127.0.0.1:5150/v1/entities?name=EntityTag&fuzzy=true'
 ```
@@ -263,84 +131,84 @@ You should be aware that **ANY** field in the data module can be part of the sea
 
 ### Environments
 
-###### HEAD all environments
+##### HEAD all environments
 ``` bash
 # HEAD environments root
 curl --head 'http://127.0.0.1:5150/v1/entities/Ent1/environments'
 ```
 
-###### PUT an environment
+##### PUT an environment
 ``` bash
 curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1' -d '{"name": "SoloEnvironmentOne"}'
 ```
 
-###### HEAD an environment
+##### HEAD an environment
 ``` bash
 # HEAD environments root
 curl --head 'http://127.0.0.1:5150/v1/entities/Ent1/environments/SoloEnv1'
 ```
 
-###### POST one or many environments (bulk import)
+##### POST one or many environments (bulk import)
 ``` bash
 curl -H 'Content-Type: application/json' -D - -XPOST 'http://127.0.0.1:5150/v1/entities/Ent1/environments' -d '[{"env_id": "Env1", "tags": ["TestEnvironmentTagOne"], "contacts": {"person1": "4155551212", "person2": "email@person2.example.com"}, "name": "TestEnvironmentOne"}, {"env_id": "Env2", "tags": ["TestEnvironmentTagOne", "TestEnvironmentTagTwo"], "contacts": {"person1": "4155551212"}, "name": "TestEnvironmentTwo"}]'
 ```
 
-###### GET environments
+##### GET environments
 ``` bash
 curl -D - 'http://127.0.0.1:5150/v1/entities/x/environments/Env2'
 ```
 
-###### GET environments and search
+##### GET environments and search
 ``` bash
 curl -D - 'http://127.0.0.1:5150/v1/entities/x/environments?contact=person1'
 ```
 
-###### GET environments and search doing a partial match using provided criteria
+##### GET environments and search doing a partial match using provided criteria
 ``` bash
 curl -D - 'http://127.0.0.1:5150/v1/entities/x/environments?tag=EnvironmentTag&fuzzy=true'
 ```
 You should be aware that **ANY** field in the data module can be part of the search criteria.
 
 
-### Devices
+## Devices
 
-###### HEAD all devices
+##### HEAD all devices
 ``` bash
 curl --head http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices
 ```
 
-###### PUT a device
+##### PUT a device
 ``` bash
 curl -H 'Content-Type: application/json' -D - -XPUT 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices/SoloDev1' -d '{"name": "SoloDeviceOne"}'
 ```
 
-###### HEAD a device
+##### HEAD a device
 ``` bash
 curl --head http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices/SoloDev1
 ```
 
-###### POST one or many devices (bulk import)
+##### POST one or many devices (bulk import)
 ``` bash
 curl -H 'Content-Type: application/json' -D - -XPOST 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices' -d '[{"dev_id": "Dev1", "tags": ["TestEnvironmentTagOne"], "access_ip": {"drac": "172.16.24.1", "mgmt": "fe80::6656:fc1d:cd1:ddba"}, "rack_id": "TestRack1", "row_id": "TestRow1", "name": "TestDeviceOne"}, {"dev_id": "Dev2", "tags": ["TestDeviceTagOne", "TestDeviceTagTwo"], "access_ip": {"drac": "172.16.24.2", "mgmt": "fe80::6656:fc1d:cd1:ddbb"}, "rack_id": "TestRack2", "row_id": "TestRow1", "name": "TestDeviceTwo"}]'
 ```
 
-###### GET devices
+##### GET devices
 ``` bash
 curl 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices'
 ```
 
-###### GET devices and search
+##### GET devices and search
 ``` bash
 curl 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices?row_id=TestRow1'
 ```
 
-###### GET devices and search doing a partial matching using provided criteria
+##### GET devices and search doing a partial matching using provided criteria
 ``` bash
 curl 'http://127.0.0.1:5150/v1/entities/Solo1/environments/SoloEnv1/devices?name=Test&fuzzy=true'
 ```
 You should be aware that **ANY** field in the data module can be part of the search criteria.
 
-###### GET an IPXE return for a specific device
+##### GET an IPXE return for a specific device
 ``` bash
 curl 'http://127.0.0.1:5150/v1/entities/TestEntity1/environments/TestEnvironment1A/devices/TestDevice1A/ipxe"
 ```
@@ -349,6 +217,19 @@ If a device has an has variable with "ipxe_" as the prefix the ipxe endpoint wil
 
 ----
 
-### Utilities
+## Utilities
 
 Automated data population can be simply done using an Ansible playbook. [More on helpful playbooks can be found here](playbooks/README.md)
+
+### Synchronizing the table space with the backend store.
+
+``` bash
+cruton-manage --config-file /etc/cruton/cruton.ini sync_tables
+```
+
+----
+Additional documentation:
+
+  * [Data Model](docs/data-model.md)
+  * [Installation](docs/installation.md)
+  * [Cassandra](docs/cassandra.md)

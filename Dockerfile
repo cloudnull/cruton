@@ -16,9 +16,7 @@ RUN apk -U upgrade && \
 
 COPY . /usr/local/src/cruton
 
-RUN apk -U add git && \
-    rm /var/cache/apk/* && \
-    pip install --compile file:///usr/local/src/cruton#egg=cruton
+RUN pip install --no-cache-dir --compile file:///usr/local/src/cruton#egg=cruton
 
 ADD ./etc/cruton/cruton.ini /etc/cruton/cruton.ini
 
