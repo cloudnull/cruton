@@ -1,6 +1,10 @@
 ![Cruton](docs/pics/cruton-logo.jpg)
 
-# Rebaked environmental device management system
+## This is a *POC* and not currently production ready. Your mileage may vary.
+
+----
+
+### Rebaked environmental device management system
 
 Environmental inventory(device) management system built for hundreds of entities, thousands environments, and millions of devices.
 <!-- TOC -->
